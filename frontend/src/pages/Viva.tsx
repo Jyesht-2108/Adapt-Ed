@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { Loader2, AlertCircle } from "lucide-react";
-import { VivaRoom } from "@/components/viva/VivaRoom";
+import { VivaExamRoom } from "@/components/viva/VivaExamRoom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -252,7 +252,7 @@ const Viva = () => {
     }
     
     return (
-      <VivaRoom
+      <VivaExamRoom
         sessionId={sessionId}
         moduleTitle={moduleTitle}
         userGoal={userGoal}
