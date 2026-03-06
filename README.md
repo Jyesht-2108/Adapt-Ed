@@ -416,11 +416,11 @@ Contributions are welcome! Please:
 
 ## 🙏 Acknowledgments
 
-- Google Gemini for AI capabilities
-- Supabase for database infrastructure
-- Firebase for authentication
-- Monaco Editor for code editing
-- All open-source contributors
+- Google Gemini for AI capabilities.
+- Supabase for database infrastructure.
+- Firebase for authentication.
+- Monaco Editor for code editing.
+- All open-source contributors.
 
 ## 📞 Support
 
