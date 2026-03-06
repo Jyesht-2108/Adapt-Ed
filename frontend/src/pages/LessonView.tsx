@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useAdaptedEngine } from "@/hooks/use-adapted-engine";
+import { CognitiveLoadDashboard } from "@/components/CognitiveLoadDashboard";
 import { 
   ArrowLeft, 
   PlayCircle, 
@@ -32,6 +34,11 @@ const LessonView = () => {
   const [error, setError] = useState<string | null>(null);
   const [generatingNotes, setGeneratingNotes] = useState(false);
   const { toast } = useToast();
+  
+  // Initialize adapted-engine for cognitive load tracking
+  useAdaptedEngine({
+    aiProvider: 'gemini', // Use Gemini for AI simplification
+  });
 
   const generateMarkdownNotes = (notes: StudyNotes): string => {
     let markdown = `# ${notes.title}\n\n`;
@@ -329,6 +336,15 @@ const LessonView = () => {
             </Button>
           </div>
         </div>
+      </motion.div>
+
+      {/* Cognitive Load Dashboard */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <CognitiveLoadDashboard />
       </motion.div>
 
       {/* Key Concepts */}

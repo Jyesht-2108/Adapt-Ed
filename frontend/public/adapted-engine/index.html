@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AdaptEd - Adaptive Cognitive Load Engine</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .metric-card {
+      background: #f8f9fa;
+      padding: 1rem;
+      border-radius: 6px;
+      border-left: 4px solid #007bff;
+    }
+    .metric-label {
+      font-size: 0.875rem;
+      color: #666;
+      margin-bottom: 0.5rem;
+    }
+    .metric-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #333;
+    }
+    .content-area {
+      margin-top: 2rem;
+      line-height: 1.8;
+    }
+    h1 { color: #007bff; }
+    p { margin-bottom: 1rem; }
+  </style>
+  <script type="module" crossorigin src="/assets/index-BQvzuwng.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>AdaptEd - Cognitive Load Telemetry</h1>
+    <p>Move your mouse, scroll, and type to see real-time cognitive load metrics.</p>
+    
+    <!-- Phase 2: Cognitive Load Score -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 2rem;">
+        <div>
+          <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Cognitive Load Score</div>
+          <div style="font-size: 3rem; font-weight: bold; line-height: 1;">
+            <span id="cognitiveScore">0</span><span style="font-size: 1.5rem;">%</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Load Level</div>
+          <div style="font-size: 1.5rem; font-weight: bold;" id="cognitiveLevel">LOW</div>
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+          <div style="font-size: 0.875rem; opacity: 0.9; margin-bottom: 0.5rem;">Recommendations</div>
+          <ul id="recommendations" style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem; line-height: 1.6;">
+            <li>Analyzing behavior...</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <div class="metrics" id="metrics">
+      <div class="metric-card">
+        <div class="metric-label">Velocity (px/ms)</div>
+        <div class="metric-value" id="velocity">0.00</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Direction Changes</div>
+        <div class="metric-value" id="directionChanges">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Backspace Rate (/10s)</div>
+        <div class="metric-value" id="backspaceRate">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Dwell Time (ms)</div>
+        <div class="metric-value" id="dwellTime">0</div>
+      </div>
+    </div>
+
+    <!-- Phase 4: Vision Tracking Metrics -->
+    <div style="background: #e7f9f0; padding: 1.5rem; border-radius: 8px; margin: 2rem 0; border-left: 4px solid #28a745;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0; color: #28a745;">👁️ Vision Tracking (Manual Control)</h3>
+        <button id="enable-vision-btn" style="
+          padding: 0.5rem 1rem;
+          background: #28a745;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: bold;
+        ">
+          Enable Webcam Tracking
+        </button>
+      </div>
+      <div class="metrics" style="margin-top: 1rem;">
+        <div class="metric-card" style="border-left-color: #28a745;">
+          <div class="metric-label">Eye Saccades (/s)</div>
+          <div class="metric-value" id="eyeSaccadeRate">-</div>
+        </div>
+        <div class="metric-card" style="border-left-color: #28a745;">
+          <div class="metric-label">Pupil Dilation</div>
+          <div class="metric-value" id="pupilDilation">-</div>
+        </div>
+        <div class="metric-card" style="border-left-color: #28a745;">
+          <div class="metric-label">Face Present</div>
+          <div class="metric-value" id="facePresent">-</div>
+        </div>
+        <div class="metric-card" style="border-left-color: #28a745;">
+          <div class="metric-label">Attention Score</div>
+          <div class="metric-value" id="attentionScore">-</div>
+        </div>
+      </div>
+      <p style="font-size: 0.875rem; color: #666; margin: 1rem 0 0 0;">
+        🔒 Privacy mode enabled. Click "Enable" to start tracking. Video is processed locally and never stored or transmitted. Tracking continues until you click "Disable".
+      </p>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+      <article>
+        <h2>Understanding Cognitive Load in Learning</h2>
+        
+        <p>Cognitive load theory postulates that our working memory possesses inherently limited capacity for processing novel information. When endeavoring to acquire new knowledge, we must judiciously manage this finite cognitive resource to circumvent the deleterious effects of information overload. This consideration becomes particularly salient in contemporary digital learning environments where an abundance of extraneous stimuli and distracting elements proliferate ubiquitously.</p>
+        
+        <p>The AdaptEd system implements a sophisticated real-time monitoring paradigm that continuously analyzes your interaction patterns and behavioral indicators. By leveraging advanced algorithms to scrutinize mouse movement trajectories, typing behavior patterns, and attention allocation metrics, the system can accurately identify when you're experiencing cognitive overload. Upon detection of elevated cognitive load, the system autonomously initiates adaptive interface modifications designed to attenuate distractions and facilitate enhanced concentration.</p>
+        
+        <p>To facilitate empirical testing of the system's capabilities, attempt to engage in typing activities within the designated input area below while deliberately utilizing the backspace key with elevated frequency. Additionally, execute erratic mouse movement patterns characterized by rapid directional changes. Furthermore, maintain prolonged hover duration over specific textual elements. These behavioral patterns will incrementally elevate your cognitive load score, and when the threshold of 70% is exceeded, the system will automatically transition into Focus Mode, implementing comprehensive interface adaptations.</p>
+        
+        <div contenteditable="true" style="border: 1px solid #ddd; padding: 1rem; border-radius: 4px; min-height: 100px; margin: 1rem 0;">
+          Type here to test keyboard tracking...
+        </div>
+        
+        <h3>How Focus Mode Works</h3>
+        
+        <p>When cognitive overload is detected through the sophisticated algorithmic analysis, Focus Mode activates automatically without requiring explicit user intervention. The system will systematically obscure distracting interface elements through opacity reduction, augment text dimensions to enhance visual accessibility and readability, and implement highlighting mechanisms to emphasize the content currently receiving your attentional focus. A reset button manifests at the bottom-right corner, providing users with the capability to voluntarily exit Focus Mode at their discretion.</p>
+        
+        <p>This adaptive methodological approach ensures that the learning environment demonstrates responsive behavior to your cognitive requirements in real-time, providing supportive interventions precisely when they are most beneficial. The fundamental objective is to facilitate the creation of a seamless, personalized learning experience that dynamically adapts to your instantaneous cognitive state, thereby optimizing knowledge acquisition and comprehension outcomes.</p>
+        
+        <h3>Semantic Restructuring Technology</h3>
+        
+        <p>When cognitive load exceeds critical thresholds (85%), the system automatically initiates semantic restructuring protocols. Dense, collegiate-level paragraphs containing complex vocabulary and intricate sentence structures are instantaneously transformed into simplified bullet-point formats. The artificial intelligence engine analyzes the semantic content, extracts the fundamental concepts, and reformulates the information using 8th-grade reading level vocabulary. This transformation occurs without user intervention, ensuring that comprehension barriers are eliminated precisely when cognitive resources are most constrained.</p>
+      </article>
+    </main>
+
+    <!-- Sidebar (will be hidden in focus mode) -->
+    <aside class="sidebar" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-top: 2rem; border-left: 4px solid #007bff;">
+      <h3>Related Topics</h3>
+      <ul>
+        <li>Working Memory Capacity</li>
+        <li>Attention Management</li>
+        <li>Learning Optimization</li>
+        <li>Adaptive Interfaces</li>
+      </ul>
+      <p style="font-size: 0.875rem; color: #666; margin-top: 1rem;">
+        This sidebar will fade out when Focus Mode is activated.
+      </p>
+    </aside>
+
+    <!-- Ad Container (will be hidden in focus mode) -->
+    <div class="ad-container" style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-top: 1rem; text-align: center; border: 2px dashed #ffc107;">
+      <p style="margin: 0; font-size: 0.875rem; color: #856404;">
+        📢 Advertisement Space - This will be hidden in Focus Mode
+      </p>
+    </div>
+
+    <!-- Phase 3 Info -->
+    <div style="background: #e7f3ff; padding: 1.5rem; border-radius: 8px; margin-top: 2rem; border-left: 4px solid #007bff;">
+      <h3 style="margin-top: 0; color: #007bff;">🎨 Progressive Intervention System</h3>
+      <p style="margin-bottom: 0.5rem;">
+        <strong>Level 1 - Semantic Restructuring:</strong> When you hover over a paragraph with 50+ cursor movements OR 10+ seconds dwell time, it automatically converts to 3 simple bullet points (8th-grade level).
+      </p>
+      <p style="margin-bottom: 0;">
+        <strong>Level 2 - Hyper-Focus Mode:</strong> If you still struggle after simplification (30+ movements OR 8+ seconds), the system hides ALL distractions, increases line spacing 50%, and applies intense highlighting.
+      </p>
+    </div>
+  </div>
+
+</body>
+</html>
