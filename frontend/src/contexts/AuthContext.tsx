@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-
-// Mock user interface (replacing Firebase User)
-interface MockUser {
-  uid: string;
-  email: string;
-  displayName: string;
-}
+import { 
+  User,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged
+} from 'firebase/auth';
+import { auth, googleProvider } from '@/lib/firebase';
 
 interface AuthContextType {
-  currentUser: MockUser | null;
+  currentUser: User | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
@@ -29,65 +29,46 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<MockUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for existing session on mount
+  // Listen to Firebase auth state changes
   useEffect(() => {
-    const storedUser = localStorage.getItem('mockUser');
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        setCurrentUser(user);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      if (user) {
         sessionStorage.setItem('user_id', user.uid);
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('mockUser');
+      } else {
+        sessionStorage.removeItem('user_id');
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    });
+
+    return unsubscribe;
   }, []);
 
-  // Mock Google Sign In
+  // Google Sign In with Firebase
   const signInWithGoogle = async () => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Create mock user
-      const mockUser: MockUser = {
-        uid: 'test_user_' + Date.now(),
-        email: 'testuser@example.com',
-        displayName: 'Test User',
-      };
-      
-      // Store in localStorage and state
-      localStorage.setItem('mockUser', JSON.stringify(mockUser));
-      sessionStorage.setItem('user_id', mockUser.uid);
-      setCurrentUser(mockUser);
-      
-      console.log('✓ Mock user signed in:', mockUser);
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log('✓ User signed in:', result.user);
     } catch (error) {
       console.error('Error signing in:', error);
       throw error;
     }
   };
 
-  // Logout
+  // Logout with Firebase
   const logout = async () => {
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await signOut(auth);
       
       // Clear all user-specific data
-      localStorage.removeItem('mockUser');
       sessionStorage.removeItem('user_id');
       localStorage.removeItem('roadmap');
       localStorage.removeItem('userProfile');
       localStorage.removeItem('vivaStatus');
       localStorage.removeItem('onboardingData');
-      
-      setCurrentUser(null);
       
       console.log('✓ Logged out and cleared user data');
     } catch (error) {

@@ -18,3 +18,4 @@ edge-tts>=6.1.0
 nest-asyncio>=1.5.0
 huggingface_hub
 pymongo>=4.6.0
+
