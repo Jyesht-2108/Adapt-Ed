@@ -13,6 +13,7 @@ import LessonView from "./pages/LessonView";
 import CodeSandbox from "./pages/CodeSandbox";
 import Viva from "./pages/Viva";
 import VivaSelection from "./pages/VivaSelection";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -109,7 +110,7 @@ const App = () => (
             path="/settings" 
             element={
               <ProtectedRoute>
-                <MainLayout><div className="text-foreground">Settings coming soon</div></MainLayout>
+                <MainLayout><Settings /></MainLayout>
               </ProtectedRoute>
             } 
           />
