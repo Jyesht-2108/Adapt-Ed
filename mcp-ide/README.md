@@ -17,12 +17,25 @@ Think **Cursor IDE** meets **Educational AI Tutor** in your browser.
 ## 🚀 Quick Start (5 Minutes)
 
 ### Prerequisites
-- Node.js 18+ and Python 3.10+
+- Node.js 18+ and Python 3.10+ (or Docker)
 - **Choose one:**
   - [Ollama](https://ollama.ai/download) for local LLM (requires 8GB+ RAM)
   - [Gemini API Key](https://makersuite.google.com/app/apikey) for cloud LLM (works on any machine)
 
-### One-Command Start
+### Option A: Docker (Recommended for Linux/Cross-platform)
+
+**No Python installation needed!**
+
+```bash
+cd mcp-ide/backend
+./docker-start.sh  # Linux/Mac
+# OR
+docker-start.bat   # Windows
+```
+
+See [DOCKER_SETUP.md](DOCKER_SETUP.md) for detailed Docker instructions.
+
+### Option B: One-Command Start (Native Python)
 
 **Windows:**
 ```cmd
@@ -36,7 +49,7 @@ chmod +x start-dev.sh && ./start-dev.sh
 
 Then open: http://localhost:5174
 
-### Manual Start
+### Option C: Manual Start
 
 **Option A: Using Ollama (Local)**
 ```bash
@@ -70,6 +83,7 @@ npm run dev
 | Document | Purpose |
 |----------|---------|
 | [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Commands, URLs, quick tips |
+| [DOCKER_SETUP.md](DOCKER_SETUP.md) | Docker setup for cross-platform |
 | [SETUP.md](SETUP.md) | Detailed setup instructions |
 | [GEMINI_SETUP.md](GEMINI_SETUP.md) | Using Gemini instead of Ollama |
 | [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) | Complete project overview |
