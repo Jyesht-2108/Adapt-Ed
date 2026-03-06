@@ -15,11 +15,15 @@ class ModuleStatus(str, Enum):
 class UserProfile(BaseModel):
     uid: str = Field(description="Firebase UID of the user")
     goal: str
-    current_skills: List[str]
-    preferred_language: str
-    time_commitment: str
+    current_skills: List[str] = Field(default_factory=list)
+    preferred_language: str = Field(default="")
+    time_commitment: str = Field(default="10 hours per week")
     notification_time: str = Field(default="09:00", description="Daily notification time in HH:MM format")
     weekly_hours: int = Field(default=10, description="Hours per week commitment")
+    # New adaptive fields
+    age: Optional[str] = Field(default=None, description="User's age")
+    expertise_level: Optional[str] = Field(default=None, description="Complete Beginner, Intermediate, or Advanced")
+    additional_context: Optional[str] = Field(default=None, description="Free-form additional context from user")
 
 
 class UserStatus(BaseModel):

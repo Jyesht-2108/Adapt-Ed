@@ -24,7 +24,7 @@ class VivaAgent:
             raise ValueError("GEMINI_API_KEY not found in environment variables")
         
         genai.configure(api_key=gemini_api_key)
-        self.gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        self.gemini_model = genai.GenerativeModel('gemini-2.5-flash')
         
         # OpenAI for voice only (Whisper + TTS)
         openai_api_key = os.getenv("OPENAI_API_KEY")

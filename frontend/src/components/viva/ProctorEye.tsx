@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { FaceLandmarker, FilesetResolver, FaceLandmarkerResult } from '@mediapipe/tasks-vision';
+import { FaceLandmarker, FilesetResolver, FaceLandmarkerResult, ObjectDetector, Detection } from '@mediapipe/tasks-vision';
 import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 interface ProctorEyeProps {
@@ -11,6 +11,7 @@ interface ProctorEyeProps {
 export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) => {
   const webcamRef = useRef<Webcam>(null);
   const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
+  const objectDetectorRef = useRef<ObjectDetector | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const lastDetectionTimeRef = useRef<number>(Date.now());
   
@@ -19,20 +20,24 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
   const [lookingAwayStartTime, setLookingAwayStartTime] = useState<number | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
-  const [currentStatus, setCurrentStatus] = useState<'active' | 'no-face' | 'multiple-faces' | 'looking-away'>('active');
+  const [currentStatus, setCurrentStatus] = useState<'active' | 'no-face' | 'multiple-faces' | 'looking-away' | 'phone-detected'>('active');
+  
+  // Phone detection accumulator (not consecutive frames)
+  const phoneDetectionCountRef = useRef<number>(0);
 
   // Constants
   const NO_FACE_THRESHOLD_MS = 2000; // 2 seconds
   const LOOKING_AWAY_THRESHOLD_MS = 2000; // 2 seconds
   const DETECTION_INTERVAL_MS = 100; // Check every 100ms
   const HEAD_POSE_THRESHOLD = 0.15; // 15% from center is considered "looking away"
+  const PHONE_DETECTION_THRESHOLD = 15; // Accumulator threshold for phone detection
 
   /**
-   * Initialize MediaPipe FaceLandmarker
+   * Initialize MediaPipe FaceLandmarker and ObjectDetector
    */
   const initializeFaceLandmarker = useCallback(async () => {
     try {
-      console.log('[ProctorEye] Initializing MediaPipe FaceLandmarker...');
+      console.log('[ProctorEye] Initializing MediaPipe FaceLandmarker and ObjectDetector...');
       
       // Load WASM files from CDN
       const vision = await FilesetResolver.forVisionTasks(
@@ -54,13 +59,26 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
         outputFacialTransformationMatrixes: false
       });
 
+      // Create ObjectDetector for phone detection with AGGRESSIVE settings
+      const objectDetector = await ObjectDetector.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite',
+          delegate: 'GPU'
+        },
+        runningMode: 'VIDEO',
+        scoreThreshold: 0.3, // LOWERED from 0.5 to catch partial/dimly lit phones
+        maxResults: 10, // Check more objects
+        categoryAllowlist: ['cell phone', 'remote control', 'book', 'laptop'] // Include common misclassifications
+      });
+
       faceLandmarkerRef.current = faceLandmarker;
+      objectDetectorRef.current = objectDetector;
       setIsInitialized(true);
       setInitError(null);
-      console.log('[ProctorEye] ✓ FaceLandmarker initialized successfully');
+      console.log('[ProctorEye] ✓ FaceLandmarker and ObjectDetector initialized successfully');
     } catch (error) {
-      console.error('[ProctorEye] Failed to initialize FaceLandmarker:', error);
-      setInitError('Failed to initialize face detection. Please refresh the page.');
+      console.error('[ProctorEye] Failed to initialize:', error);
+      setInitError('Failed to initialize detection. Please refresh the page.');
       setIsInitialized(false);
     }
   }, []);
@@ -93,7 +111,7 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
    * Process video frame and detect violations
    */
   const detectViolations = useCallback(() => {
-    if (!isActive || !isInitialized || !faceLandmarkerRef.current || !webcamRef.current) {
+    if (!isActive || !isInitialized || !faceLandmarkerRef.current || !objectDetectorRef.current || !webcamRef.current) {
       return;
     }
 
@@ -114,8 +132,59 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
 
     try {
       // Detect faces in current frame
-      const result = faceLandmarkerRef.current.detectForVideo(video, now);
-      const numFaces = result.faceLandmarks.length;
+      const faceResult = faceLandmarkerRef.current.detectForVideo(video, now);
+      const numFaces = faceResult.faceLandmarks.length;
+      
+      // Detect objects (phones) in current frame
+      const objectResult = objectDetectorRef.current.detectForVideo(video, now);
+      const detections = objectResult.detections || [];
+      
+      // DEBUG: Log all detections if any found
+      if (detections.length > 0) {
+        console.log('[ProctorEye] Detected objects:', detections.map((d: Detection) => ({
+          name: d.categories[0]?.categoryName,
+          score: d.categories[0]?.score?.toFixed(2)
+        })));
+      }
+      
+      // RULE 0: Phone Detection (Accumulator-based, not consecutive)
+      let phoneDetectedThisFrame = false;
+      
+      for (const detection of detections) {
+        const category = detection.categories[0];
+        if (!category) continue;
+        
+        const categoryName = category.categoryName.toLowerCase();
+        const score = category.score || 0;
+        
+        // Broadened check: cell phone, remote (common misclassification), or phone-like objects
+        const isPhone = categoryName.includes('cell') || 
+                       categoryName.includes('phone') || 
+                       categoryName.includes('remote');
+        
+        if (isPhone && score >= 0.3) {
+          console.log(`[ProctorEye] 📱 Phone-like object detected: ${category.categoryName} (${(score * 100).toFixed(1)}%)`);
+          phoneDetectedThisFrame = true;
+          break;
+        }
+      }
+      
+      // Update phone detection accumulator
+      if (phoneDetectedThisFrame) {
+        phoneDetectionCountRef.current++;
+        console.log(`[ProctorEye] Phone accumulator: ${phoneDetectionCountRef.current}/${PHONE_DETECTION_THRESHOLD}`);
+      } else {
+        // Decrement but don't go below 0
+        phoneDetectionCountRef.current = Math.max(0, phoneDetectionCountRef.current - 1);
+      }
+      
+      // Trigger violation if accumulator exceeds threshold
+      if (phoneDetectionCountRef.current > PHONE_DETECTION_THRESHOLD) {
+        setCurrentStatus('phone-detected');
+        onViolation('UNAUTHORIZED_DEVICE', 'Unauthorized electronic device (cell phone) detected in frame');
+        phoneDetectionCountRef.current = 0; // Reset accumulator after triggering
+        console.log('[ProctorEye] 🚨 PHONE VIOLATION TRIGGERED');
+      }
 
       // RULE 1: No Face Detection
       if (numFaces === 0) {
@@ -141,7 +210,7 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
         setLookingAwayStartTime(null);
       }
       // RULE 3: Looking Away Detection
-      else if (isLookingAway(result)) {
+      else if (isLookingAway(faceResult)) {
         setCurrentStatus('looking-away');
         
         if (lookingAwayStartTime === null) {
@@ -154,9 +223,11 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
         // Reset no face timer
         setNoFaceStartTime(null);
       }
-      // All good - reset timers
+      // All good - reset timers (but keep phone accumulator)
       else {
-        setCurrentStatus('active');
+        if (phoneDetectionCountRef.current === 0) {
+          setCurrentStatus('active');
+        }
         setNoFaceStartTime(null);
         setLookingAwayStartTime(null);
       }
@@ -181,6 +252,9 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
       }
       if (faceLandmarkerRef.current) {
         faceLandmarkerRef.current.close();
+      }
+      if (objectDetectorRef.current) {
+        objectDetectorRef.current.close();
       }
     };
   }, [initializeFaceLandmarker]);
@@ -220,6 +294,8 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
         return 'border-red-500';
       case 'looking-away':
         return 'border-orange-500';
+      case 'phone-detected':
+        return 'border-red-600 animate-pulse';
       default:
         return 'border-gray-500';
     }
@@ -240,6 +316,8 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
       case 'multiple-faces':
       case 'looking-away':
         return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      case 'phone-detected':
+        return <AlertTriangle className="h-4 w-4 text-red-600 animate-pulse" />;
       default:
         return <Eye className="h-4 w-4 text-gray-500" />;
     }
@@ -261,6 +339,8 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
         return 'Multiple Faces';
       case 'looking-away':
         return 'Looking Away';
+      case 'phone-detected':
+        return '📱 Phone Detected!';
       default:
         return 'Proctor Active';
     }
@@ -336,6 +416,7 @@ export const ProctorEye = ({ onViolation, isActive = true }: ProctorEyeProps) =>
             {currentStatus === 'no-face' && 'Please stay in frame'}
             {currentStatus === 'multiple-faces' && 'Only one person allowed'}
             {currentStatus === 'looking-away' && 'Please look at screen'}
+            {currentStatus === 'phone-detected' && '📱 Remove phone immediately!'}
           </p>
         </div>
       )}
