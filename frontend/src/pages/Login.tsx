@@ -41,7 +41,8 @@ const Login = () => {
             }
           }
           
-          // Check user status from backend
+          // Check user status from backend with timeout
+          console.log('Checking user status from backend...');
           const status = await getUserStatus(currentUser.uid);
           
           console.log('User status from backend:', status);
@@ -66,8 +67,19 @@ const Login = () => {
           }
         } catch (error) {
           console.error('Error checking user status:', error);
-          // If error checking status, assume new user and go to onboarding
-          navigate('/onboarding');
+          
+          // Show error toast
+          toast({
+            title: 'Connection Issue',
+            description: 'Taking longer than expected. Redirecting to onboarding...',
+            variant: 'default',
+          });
+          
+          // If error checking status (timeout or server error), assume new user and go to onboarding
+          // This prevents users from being stuck on the loading screen
+          setTimeout(() => {
+            navigate('/onboarding');
+          }, 1000);
         } finally {
           setIsCheckingStatus(false);
         }
@@ -75,7 +87,7 @@ const Login = () => {
     };
 
     checkUserStatus();
-  }, [currentUser, navigate]);
+  }, [currentUser, navigate, toast]);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);

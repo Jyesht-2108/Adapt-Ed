@@ -14,7 +14,8 @@ from tools import search_youtube_video, get_video_transcript, get_video_content,
 from tools.tts_tool import generate_audio_bytes
 # from database import save_user_profile, get_user, check_user_status, update_user_roadmap
 # Uncomment the line below and comment the line above to use MongoDB
-from mongodb_database import save_user_profile, get_user, check_user_status, update_user_roadmap
+# from mongodb_database import save_user_profile, get_user, check_user_status, update_user_roadmap
+from database import save_user_profile, get_user, check_user_status, update_user_roadmap
 from viva_database import create_session, get_session, update_session
 from dotenv import load_dotenv
 import os
@@ -1166,19 +1167,25 @@ async def get_user_stats(uid: str):
         # Load user data
         user_data = get_user(uid)
         if not user_data:
+            print(f"[STATS] User {uid} not found in database", file=sys.stderr, flush=True)
             raise HTTPException(
                 status_code=404,
                 detail=f"User {uid} not found"
             )
         
+        print(f"[STATS] User data keys: {user_data.keys()}", file=sys.stderr, flush=True)
+        
         roadmap = user_data.get("roadmap")
         if not roadmap:
+            print(f"[STATS] No roadmap found for user {uid}", file=sys.stderr, flush=True)
+            print(f"[STATS] User data: {user_data}", file=sys.stderr, flush=True)
             raise HTTPException(
                 status_code=404,
                 detail=f"No roadmap found for user {uid}"
             )
         
         modules = roadmap.get("modules", [])
+        print(f"[STATS] Found {len(modules)} modules", file=sys.stderr, flush=True)
         
         # Calculate statistics
         total_modules = len(modules)
@@ -1248,6 +1255,14 @@ async def get_user_stats(uid: str):
         
     except HTTPException:
         raise
+    except Exception as e:
+        import traceback
+        error_msg = f"[STATS] Error calculating stats: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg, file=sys.stderr, flush=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to calculate stats: {str(e)}"
+        )
     except Exception as e:
         import traceback
         error_msg = f"Error fetching user stats: {str(e)}\n{traceback.format_exc()}"

@@ -53,25 +53,30 @@ const Dashboard = () => {
     // Fetch user stats from backend
     const fetchStats = async () => {
       if (!currentUser?.uid) {
+        console.warn('[DASHBOARD] No user ID, cannot fetch stats');
         setLoading(false);
         return;
       }
       
       try {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+        console.log(`[DASHBOARD] Fetching stats from: ${API_URL}/users/${currentUser.uid}/stats`);
+        
         const response = await fetch(`${API_URL}/users/${currentUser.uid}/stats`);
+        
         if (!response.ok) {
-          console.warn('Failed to fetch stats from backend, using localStorage');
-          // Fall back to localStorage if backend fails
-          setLoading(false);
-          return;
+          const errorText = await response.text();
+          console.error('[DASHBOARD] Failed to fetch stats:', response.status, errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
+        
         const data = await response.json();
+        console.log("[DASHBOARD] Stats fetched successfully:", data);
         setStats(data);
-        console.log("[DASHBOARD] Stats fetched:", data);
       } catch (error) {
-        console.error('Error fetching stats:', error);
-        // Fall back to mock data on error
+        console.error('[DASHBOARD] Error fetching stats:', error);
+        console.warn('[DASHBOARD] Falling back to mock data');
+        // Stats will remain null, triggering fallback to mock data
       } finally {
         setLoading(false);
       }
@@ -84,6 +89,7 @@ const Dashboard = () => {
   const userName = currentUser?.displayName || mockUser.name;
   
   // Use real stats if available, otherwise fall back to mock data
+  const usingMockData = !stats;
   const completedModules = stats?.completed_modules ?? mockRoadmap.modules.filter(m => m.status === "completed").length;
   const totalModules = stats?.total_modules ?? mockRoadmap.modules.length;
   const currentModule = stats?.current_module ?? mockRoadmap.modules.find(m => m.status === "in-progress");
@@ -93,6 +99,10 @@ const Dashboard = () => {
   const xp = stats?.xp ?? mockUser.xp;
   const level = stats?.level ?? mockUser.level;
   const progressPercentage = stats?.progress_percentage ?? 0;
+  
+  // Log data source for debugging
+  console.log('[DASHBOARD] Using mock data:', usingMockData);
+  console.log('[DASHBOARD] Stats:', { completedModules, totalModules, vivaScore, vivaCount, streak, xp, level });
 
   if (loading) {
     return (

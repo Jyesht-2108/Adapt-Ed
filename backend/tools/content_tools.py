@@ -192,37 +192,78 @@ def search_web_docs(query: str) -> Optional[ContentResult]:
     """
     try:
         # Step 1: Search for documentation using DuckDuckGo
+        print(f"[search_web_docs] Searching for: {query}")
+        
         with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=5))
+            # Try multiple search strategies
+            search_queries = [
+                f"{query} site:docs.aws.amazon.com",  # AWS specific
+                f"{query} official documentation",
+                f"{query} docs tutorial guide"
+            ]
             
-            # Look for documentation URLs (prioritize official docs)
             doc_url = None
             doc_title = None
             
-            for result in results:
-                url = result.get('href', '')
-                title = result.get('title', '')
-                
-                # Prioritize official documentation sites
-                if any(domain in url.lower() for domain in ['docs.', 'documentation', 'readthedocs', 'github.io']):
-                    doc_url = url
-                    doc_title = title
-                    break
-            
-            # If no official docs found, use first result
-            if not doc_url and results:
-                doc_url = results[0].get('href', '')
-                doc_title = results[0].get('title', '')
+            for search_query in search_queries:
+                print(f"[search_web_docs] Trying query: {search_query}")
+                try:
+                    results = list(ddgs.text(search_query, max_results=10))
+                    
+                    if not results:
+                        continue
+                    
+                    # Look for documentation URLs (prioritize official docs)
+                    for result in results:
+                        url = result.get('href', '')
+                        title = result.get('title', '')
+                        
+                        print(f"[search_web_docs] Found result: {title[:50]}... - {url}")
+                        
+                        # Prioritize official documentation sites
+                        if any(domain in url.lower() for domain in [
+                            'docs.aws.amazon.com',
+                            'aws.amazon.com/documentation',
+                            'docs.', 
+                            'documentation', 
+                            'readthedocs', 
+                            'github.io',
+                            '.dev',
+                            'developer.'
+                        ]):
+                            doc_url = url
+                            doc_title = title
+                            print(f"[search_web_docs] Selected official doc: {doc_url}")
+                            break
+                    
+                    # If found a good URL, stop searching
+                    if doc_url:
+                        break
+                    
+                    # If no official docs found, use first result
+                    if not doc_url and results:
+                        doc_url = results[0].get('href', '')
+                        doc_title = results[0].get('title', '')
+                        print(f"[search_web_docs] Using first result: {doc_url}")
+                        
+                except Exception as e:
+                    print(f"[search_web_docs] Error with query '{search_query}': {e}")
+                    continue
             
             if not doc_url:
+                print("[search_web_docs] No documentation URL found")
                 return None
         
         # Step 2: Scrape the documentation page
+        print(f"[search_web_docs] Scraping: {doc_url}")
         scraped_text = scrape_documentation(doc_url)
         
         # Check if scraping failed
         if scraped_text.startswith("Error:") or not scraped_text:
+            print(f"[search_web_docs] Scraping failed: {scraped_text[:100]}")
             return None
+        
+        print(f"[search_web_docs] Successfully scraped {len(scraped_text)} chars")
         
         return ContentResult(
             text=scraped_text,
@@ -232,13 +273,16 @@ def search_web_docs(query: str) -> Optional[ContentResult]:
         )
         
     except Exception as e:
-        print(f"Error searching web docs: {e}")
+        print(f"[search_web_docs] Error searching web docs: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
 def _search_youtube_fallback(query: str) -> Optional[Dict[str, str]]:
     """
     Fallback YouTube search using DuckDuckGo (used when API quota exceeded).
+    Excludes YouTube Shorts.
     
     Args:
         query: Search query
@@ -247,19 +291,29 @@ def _search_youtube_fallback(query: str) -> Optional[Dict[str, str]]:
         Dictionary with video metadata or None
     """
     try:
-        search_query = f"{query} tutorial site:youtube.com"
+        # Add -shorts -#shorts to exclude Shorts
+        search_query = f"{query} full course tutorial -shorts -#shorts site:youtube.com"
         print(f"Using DuckDuckGo fallback for: {search_query}")
         
         with DDGS() as ddgs:
-            results = list(ddgs.text(search_query, max_results=5))
+            results = list(ddgs.text(search_query, max_results=15))
         
         if not results:
             return None
         
-        # Find the first valid YouTube URL
+        # Find the first valid YouTube URL (excluding Shorts)
         for result in results:
             url = result.get('href', '')
             title = result.get('title', '')
+            
+            # Safety net: Filter out Shorts URLs and titles
+            if '/shorts/' in url:
+                print(f"  Skipping Shorts URL: {url}")
+                continue
+            
+            if any(keyword in title.lower() for keyword in ['#shorts', '#short', 'shorts']):
+                print(f"  Skipping Shorts title: {title}")
+                continue
             
             if 'youtube.com/watch?v=' in url or 'youtu.be/' in url:
                 video_id = _extract_video_id(url)
@@ -291,6 +345,7 @@ def search_youtube_video(query: str, max_results: int = 5) -> Optional[List[Dict
     Search for YouTube videos using official YouTube Data API v3.
     Returns a list of videos sorted by view count (highest first).
     Falls back to DuckDuckGo if API quota is exceeded.
+    Excludes YouTube Shorts to prioritize educational content.
     
     Args:
         query: Search query (e.g., "Python Docker tutorial")
@@ -316,30 +371,62 @@ def search_youtube_video(query: str, max_results: int = 5) -> Optional[List[Dict
         # Initialize YouTube API client
         youtube = build('youtube', 'v3', developerKey=youtube_api_key)
         
-        # Step 1: Search for videos
-        search_query = f"{query} tutorial"
+        # Step 1: Search for videos with Shorts exclusion
+        # Append -shorts -#shorts to exclude YouTube Shorts
+        search_query = f"{query} full course tutorial -shorts -#shorts"
         print(f"Searching YouTube API for: {search_query}")
         
         search_response = youtube.search().list(
             q=search_query,
             part='id,snippet',
-            maxResults=max_results,
-            type='video'
+            maxResults=max_results * 3,  # Request more to filter out shorts
+            type='video',
+            videoDuration='medium'  # 4-20 minutes, excludes very short videos
         ).execute()
+        
+        if not search_response.get('items'):
+            # Try again with 'long' duration (>20 minutes)
+            print("No medium videos found, trying long videos...")
+            search_response = youtube.search().list(
+                q=search_query,
+                part='id,snippet',
+                maxResults=max_results * 3,
+                type='video',
+                videoDuration='long'  # >20 minutes
+            ).execute()
         
         if not search_response.get('items'):
             print("No videos found via YouTube API")
             fallback_result = _search_youtube_fallback(query)
             return [fallback_result] if fallback_result else None
         
-        # Step 2: Extract video IDs
-        video_ids = [item['id']['videoId'] for item in search_response['items']]
-        print(f"Found {len(video_ids)} videos")
+        # Step 2: Extract video IDs and filter out Shorts
+        video_ids = []
+        video_titles = {}
         
-        # Step 3: Get video statistics
+        for item in search_response['items']:
+            video_id = item['id']['videoId']
+            title = item['snippet']['title']
+            
+            # Filter out videos with "shorts" or "#shorts" in title
+            if any(keyword in title.lower() for keyword in ['#shorts', '#short', 'shorts', '#tiktok']):
+                print(f"  Skipping Shorts video: {title}")
+                continue
+            
+            video_ids.append(video_id)
+            video_titles[video_id] = title
+        
+        if not video_ids:
+            print("All videos were Shorts, trying fallback")
+            fallback_result = _search_youtube_fallback(query)
+            return [fallback_result] if fallback_result else None
+        
+        print(f"Found {len(video_ids)} non-Shorts videos")
+        
+        # Step 3: Get video statistics and content details
         videos_response = youtube.videos().list(
             id=','.join(video_ids),
-            part='statistics,snippet'
+            part='statistics,snippet,contentDetails'
         ).execute()
         
         if not videos_response.get('items'):
@@ -347,7 +434,7 @@ def search_youtube_video(query: str, max_results: int = 5) -> Optional[List[Dict
             fallback_result = _search_youtube_fallback(query)
             return [fallback_result] if fallback_result else None
         
-        # Step 4: Parse and sort by view count
+        # Step 4: Parse and filter by duration
         video_data = []
         for video in videos_response['items']:
             try:
@@ -355,6 +442,27 @@ def search_youtube_video(query: str, max_results: int = 5) -> Optional[List[Dict
                 title = video['snippet']['title']
                 channel = video['snippet']['channelTitle']
                 view_count = int(video['statistics'].get('viewCount', 0))
+                
+                # Additional filter: Check duration to exclude very short videos
+                duration = video.get('contentDetails', {}).get('duration', '')
+                # Parse ISO 8601 duration (e.g., PT1M30S = 1 min 30 sec)
+                # Skip videos shorter than 3 minutes
+                if 'PT' in duration:
+                    # Simple check: if duration doesn't contain 'M' (minutes) or 'H' (hours), it's likely < 1 min
+                    if 'H' not in duration and 'M' not in duration:
+                        print(f"  Skipping short video: {title} (duration: {duration})")
+                        continue
+                    
+                    # Additional check: if it has minutes but is very short (e.g., PT1M = 1 minute)
+                    if 'M' in duration and 'H' not in duration:
+                        # Extract minutes
+                        import re
+                        match = re.search(r'PT(\d+)M', duration)
+                        if match:
+                            minutes = int(match.group(1))
+                            if minutes < 3:
+                                print(f"  Skipping short video: {title} ({minutes} minutes)")
+                                continue
                 
                 video_data.append({
                     'url': f"https://www.youtube.com/watch?v={video_id}",
@@ -364,7 +472,7 @@ def search_youtube_video(query: str, max_results: int = 5) -> Optional[List[Dict
                     'view_count_int': view_count
                 })
                 
-                print(f"  - {title} by {channel} ({_format_view_count(view_count)} views)")
+                print(f"  ✓ {title} by {channel} ({_format_view_count(view_count)} views)")
             except Exception as e:
                 print(f"Error parsing video: {e}")
                 continue
@@ -375,6 +483,31 @@ def search_youtube_video(query: str, max_results: int = 5) -> Optional[List[Dict
         
         # Step 5: Sort by view count (highest first)
         video_data.sort(key=lambda x: x['view_count_int'], reverse=True)
+        
+        # Limit to max_results
+        video_data = video_data[:max_results]
+        
+        print(f"Returning {len(video_data)} videos sorted by views")
+        
+        # Remove internal sorting field from all videos
+        for video in video_data:
+            del video['view_count_int']
+        
+        return video_data
+        
+    except HttpError as e:
+        # Handle API quota exceeded (403) or other HTTP errors
+        if e.resp.status == 403:
+            print(f"YouTube API quota exceeded, falling back to DuckDuckGo")
+        else:
+            print(f"YouTube API error ({e.resp.status}): {e}")
+        fallback_result = _search_youtube_fallback(query)
+        return [fallback_result] if fallback_result else None
+        
+    except Exception as e:
+        print(f"Error searching YouTube: {e}")
+        fallback_result = _search_youtube_fallback(query)
+        return [fallback_result] if fallback_result else None
         
         print(f"Returning {len(video_data)} videos sorted by views")
         
@@ -528,13 +661,18 @@ def _search_youtube_video(query: str) -> Optional[str]:
 def _extract_video_id(url: str) -> Optional[str]:
     """
     Extract YouTube video ID from various URL formats.
+    Excludes YouTube Shorts URLs.
     
     Args:
         url: YouTube URL
         
     Returns:
-        Video ID or None
+        Video ID or None (returns None for Shorts URLs)
     """
+    # Safety net: Reject Shorts URLs
+    if '/shorts/' in url:
+        return None
+    
     patterns = [
         r'(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})',
         r'youtube\.com\/embed\/([a-zA-Z0-9_-]{11})',
@@ -561,36 +699,63 @@ def scrape_documentation(url: str, max_chars: int = 10000) -> str:
         Cleaned text content (up to max_chars) or error message
     """
     try:
+        print(f"[scrape_documentation] Fetching: {url}")
+        
         # Set headers to mimic a browser request
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         }
         
         # Make the request
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
         response.raise_for_status()
+        
+        print(f"[scrape_documentation] Status: {response.status_code}")
         
         # Parse HTML
         soup = BeautifulSoup(response.content, 'lxml')
         
         # Remove script and style elements
-        for script in soup(['script', 'style', 'nav', 'header', 'footer', 'aside']):
+        for script in soup(['script', 'style', 'nav', 'header', 'footer', 'aside', 'iframe', 'noscript']):
             script.decompose()
         
-        # Extract text from paragraphs and code blocks
+        # Extract text from main content areas (try multiple selectors)
         text_elements = []
         
-        # Get all paragraph text
-        for p in soup.find_all('p'):
-            text = p.get_text().strip()
-            if text:
-                text_elements.append(text)
+        # Try to find main content area first
+        main_content = soup.find('main') or soup.find('article') or soup.find('div', class_=re.compile(r'content|main|body|article', re.I))
         
-        # Get all code blocks
-        for code in soup.find_all('code'):
-            text = code.get_text().strip()
-            if text and len(text) < 500:  # Avoid huge code blocks
-                text_elements.append(f"Code: {text}")
+        if main_content:
+            print("[scrape_documentation] Found main content area")
+            # Get all paragraph text from main content
+            for p in main_content.find_all(['p', 'li', 'h1', 'h2', 'h3', 'h4']):
+                text = p.get_text().strip()
+                if text and len(text) > 20:  # Skip very short snippets
+                    text_elements.append(text)
+            
+            # Get code blocks from main content
+            for code in main_content.find_all('code'):
+                text = code.get_text().strip()
+                if text and len(text) < 500:  # Avoid huge code blocks
+                    text_elements.append(f"Code: {text}")
+        else:
+            print("[scrape_documentation] No main content area, using all paragraphs")
+            # Fallback: Get all paragraph text
+            for p in soup.find_all('p'):
+                text = p.get_text().strip()
+                if text and len(text) > 20:
+                    text_elements.append(text)
+            
+            # Get all code blocks
+            for code in soup.find_all('code'):
+                text = code.get_text().strip()
+                if text and len(text) < 500:
+                    text_elements.append(f"Code: {text}")
         
         # Combine all text
         full_text = "\n\n".join(text_elements)
@@ -599,6 +764,8 @@ def scrape_documentation(url: str, max_chars: int = 10000) -> str:
         full_text = re.sub(r'\n\s*\n', '\n\n', full_text)
         full_text = re.sub(r' +', ' ', full_text)
         full_text = full_text.strip()
+        
+        print(f"[scrape_documentation] Extracted {len(full_text)} chars, {len(text_elements)} elements")
         
         # Return up to max_chars
         if not full_text:
@@ -615,6 +782,9 @@ def scrape_documentation(url: str, max_chars: int = 10000) -> str:
     except requests.exceptions.HTTPError as e:
         return f"Error: HTTP {e.response.status_code} while accessing '{url}'"
     except Exception as e:
+        print(f"[scrape_documentation] Error: {e}")
+        import traceback
+        traceback.print_exc()
         return f"Error scraping documentation: {str(e)}"
 
 

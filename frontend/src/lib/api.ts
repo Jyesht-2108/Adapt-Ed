@@ -69,6 +69,20 @@ export interface StudyNotes {
   sources: Source[];
 }
 
+export interface UserProfile {
+  uid: string;
+  goal: string;
+  current_skills?: string[];
+  preferred_language?: string;
+  time_commitment?: string;
+  notification_time?: string;
+  weekly_hours?: number;
+  // New adaptive fields
+  age?: string;
+  expertise_level?: string;
+  additional_context?: string;
+}
+
 /**
  * Generate lesson content from topic
  */
@@ -141,13 +155,28 @@ export async function fetchTranscript(videoId: string): Promise<any> {
  * Get user status (check if onboarding completed)
  */
 export async function getUserStatus(uid: string): Promise<UserStatus> {
-  const response = await fetch(`${API_URL}/users/${uid}/status`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+  
+  try {
+    const response = await fetch(`${API_URL}/users/${uid}/status`, {
+      signal: controller.signal
+    });
 
-  if (!response.ok) {
-    throw new Error('Failed to get user status');
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error('Failed to get user status');
+    }
+
+    return response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout - server is taking too long to respond');
+    }
+    throw error;
   }
-
-  return response.json();
 }
 
 /**
@@ -182,7 +211,8 @@ export async function generateRoadmap(profile: UserProfile): Promise<any> {
   });
 
   if (!response.ok) {
-    throw new Error('Failed to generate roadmap');
+    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(errorData.detail || `Failed to generate roadmap (${response.status})`);
   }
 
   return response.json();
