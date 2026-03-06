@@ -16,11 +16,11 @@
     --muted-foreground: 215.4 16.3% 46.9%;
     --border: 214.3 31.8% 91.4%;
     
-    /* Sidebar colors */
-    --sidebar-bg: 0 0% 98%;
-    --sidebar-fg: 222.2 47.4% 11.2%;
-    --sidebar-border: 214.3 31.8% 91.4%;
-    --sidebar-hover: 210 40% 96.1%;
+    /* Sidebar colors - Dark blue theme */
+    --sidebar-bg: 220 70% 15%;
+    --sidebar-fg: 210 40% 98%;
+    --sidebar-border: 220 70% 12%;
+    --sidebar-hover: 220 70% 20%;
     --sidebar-active: 221.2 83.2% 53.3%;
   }
 
