@@ -1,16 +1,17 @@
-import axios from 'axios';
+/**
+ * API client for AdaptEd backend
+ * Main AdaptEd Backend (NOT mcp-ide which runs on 8000)
+ */
 
-// Main AdaptEd Backend (NOT mcp-ide which runs on 8000)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
-
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001';
 
 export interface UserStatus {
+  uid: string;
   onboarding_completed: boolean;
-  roadmap?: any;
   profile?: any;
+  roadmap?: any;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserProfile {
@@ -23,16 +24,28 @@ export interface UserProfile {
   weekly_hours: number;
 }
 
-export interface LessonSource {
-  title: string;
+export interface VideoTranscriptData {
+  text: string;
   url: string;
-  type: string;
-  metadata?: Record<string, any>;
+  video_id: string;
+}
+
+export interface LessonRequestWithTranscript {
+  topic: string;
+  user_preference: string;
+  video_transcript?: VideoTranscriptData;
 }
 
 export interface CodeSnippet {
   language: string;
   code: string;
+}
+
+export interface Source {
+  title: string;
+  url: string;
+  type: string;
+  metadata?: Record<string, string>;
 }
 
 export interface LessonContent {
@@ -42,7 +55,7 @@ export interface LessonContent {
   main_content: string;
   code_snippets: CodeSnippet[];
   quiz_question: string;
-  sources: LessonSource[];
+  sources: Source[];
   citation_map?: Record<string, number>;
 }
 
@@ -53,86 +66,346 @@ export interface StudyNotes {
   key_takeaways: string[];
   practice_exercises: string[];
   additional_resources: string[];
-  sources: LessonSource[];
+  sources: Source[];
 }
 
-export interface LessonRequest {
-  topic: string;
-  user_preference: string;
-  video_transcript?: {
-    text: string;
-    url: string;
-  };
+/**
+ * Generate lesson content from topic
+ */
+export async function generateLessonContent(
+  request: LessonRequestWithTranscript
+): Promise<LessonContent> {
+  const response = await fetch(`${API_URL}/generate-lesson-content`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to generate lesson content');
+  }
+
+  return response.json();
 }
 
-// ============================================================================
-// USER API
-// ============================================================================
+/**
+ * Generate study notes from lesson content
+ */
+export async function generateStudyNotes(
+  lesson: LessonContent
+): Promise<StudyNotes> {
+  const response = await fetch(`${API_URL}/generate-study-notes`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(lesson),
+  });
 
-export const getUserStatus = async (userId: string): Promise<UserStatus> => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/users/${userId}/status`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching user status:', error);
-    throw error;
+  if (!response.ok) {
+    throw new Error('Failed to generate study notes');
   }
-};
 
-export const updateUserProfile = async (userId: string, profileData: any) => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/users/${userId}/profile`, profileData);
-    return response.data;
-  } catch (error) {
-    console.error('Error updating user profile:', error);
-    throw error;
+  return response.json();
+}
+
+/**
+ * Search for YouTube videos
+ */
+export async function searchYouTube(query: string): Promise<any[]> {
+  const response = await fetch(`${API_URL}/search-youtube?query=${encodeURIComponent(query)}`);
+
+  if (!response.ok) {
+    throw new Error('Failed to search YouTube');
   }
-};
 
-export const saveRoadmap = async (userId: string, roadmap: any) => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/users/${userId}/roadmap`, roadmap);
-    return response.data;
-  } catch (error) {
-    console.error('Error saving roadmap:', error);
-    throw error;
+  return response.json();
+}
+
+/**
+ * Fetch YouTube transcript
+ */
+export async function fetchTranscript(videoId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/fetch-transcript/${videoId}`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch transcript');
   }
-};
 
-// ============================================================================
-// ROADMAP API
-// ============================================================================
+  return response.json();
+}
 
-export const generateRoadmap = async (profile: UserProfile) => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/generate-roadmap`, profile);
-    return response.data;
-  } catch (error) {
-    console.error('Error generating roadmap:', error);
-    throw error;
+/**
+ * Get user status (check if onboarding completed)
+ */
+export async function getUserStatus(uid: string): Promise<UserStatus> {
+  const response = await fetch(`${API_URL}/users/${uid}/status`);
+
+  if (!response.ok) {
+    throw new Error('Failed to get user status');
   }
-};
 
-// ============================================================================
-// LESSON API
-// ============================================================================
+  return response.json();
+}
 
-export const generateLessonContent = async (request: LessonRequest): Promise<LessonContent> => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/generate-lesson-content`, request);
-    return response.data;
-  } catch (error) {
-    console.error('Error generating lesson content:', error);
-    throw error;
+/**
+ * Save user profile
+ */
+export async function saveUserProfile(profile: any): Promise<any> {
+  const response = await fetch(`${API_URL}/users/profile`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(profile),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to save user profile');
   }
-};
 
-export const generateStudyNotes = async (lesson: LessonContent): Promise<StudyNotes> => {
-  try {
-    const response = await axios.post(`${API_BASE_URL}/generate-study-notes`, lesson);
-    return response.data;
-  } catch (error) {
-    console.error('Error generating study notes:', error);
-    throw error;
+  return response.json();
+}
+
+/**
+ * Generate roadmap
+ */
+export async function generateRoadmap(profile: any): Promise<any> {
+  const response = await fetch(`${API_URL}/generate-roadmap`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(profile),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to generate roadmap');
   }
-};
+
+  return response.json();
+}
+
+/**
+ * Get user stats
+ */
+export async function getUserStats(uid: string): Promise<any> {
+  const response = await fetch(`${API_URL}/users/${uid}/stats`);
+
+  if (!response.ok) {
+    throw new Error('Failed to get user stats');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get user roadmap
+ */
+export async function getUserRoadmap(uid: string): Promise<any> {
+  const response = await fetch(`${API_URL}/users/${uid}/roadmap`);
+
+  if (!response.ok) {
+    throw new Error('Failed to get user roadmap');
+  }
+
+  return response.json();
+}
+
+/**
+ * Complete viva exam
+ */
+export async function completeViva(data: {
+  user_id: string;
+  module_id: string;
+  final_score: number;
+  academic_dishonesty_flag?: boolean;
+  integrity_log?: string[];
+}): Promise<any> {
+  const response = await fetch(`${API_URL}/viva/complete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to complete viva');
+  }
+
+  return response.json();
+}
+>>>>>>> 0cee516be736ee35af585dd32a5a8c33e912245a
+
+/**
+ * Generate lesson content from topic
+ */
+export async function generateLessonContent(
+  request: LessonRequestWithTranscript
+): Promise<LessonContent> {
+  const response = await fetch(`${API_URL}/generate-lesson-content`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to generate lesson content');
+  }
+
+  return response.json();
+}
+
+/**
+ * Generate study notes from lesson content
+ */
+export async function generateStudyNotes(
+  lesson: LessonContent
+): Promise<StudyNotes> {
+  const response = await fetch(`${API_URL}/generate-study-notes`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(lesson),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to generate study notes');
+  }
+
+  return response.json();
+}
+
+/**
+ * Search for YouTube videos
+ */
+export async function searchYouTube(query: string): Promise<any[]> {
+  const response = await fetch(`${API_URL}/search-youtube?query=${encodeURIComponent(query)}`);
+
+  if (!response.ok) {
+    throw new Error('Failed to search YouTube');
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch YouTube transcript
+ */
+export async function fetchTranscript(videoId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/fetch-transcript/${videoId}`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch transcript');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get user status (check if onboarding completed)
+ */
+export async function getUserStatus(uid: string): Promise<UserStatus> {
+  const response = await fetch(`${API_URL}/users/${uid}/status`);
+
+  if (!response.ok) {
+    throw new Error('Failed to get user status');
+  }
+
+  return response.json();
+}
+
+/**
+ * Save user profile
+ */
+export async function saveUserProfile(profile: any): Promise<any> {
+  const response = await fetch(`${API_URL}/users/profile`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(profile),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to save user profile');
+  }
+
+  return response.json();
+}
+
+/**
+ * Generate roadmap
+ */
+export async function generateRoadmap(profile: UserProfile): Promise<any> {
+  const response = await fetch(`${API_URL}/generate-roadmap`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(profile),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to generate roadmap');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get user stats
+ */
+export async function getUserStats(uid: string): Promise<any> {
+  const response = await fetch(`${API_URL}/users/${uid}/stats`);
+
+  if (!response.ok) {
+    throw new Error('Failed to get user stats');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get user roadmap
+ */
+export async function getUserRoadmap(uid: string): Promise<any> {
+  const response = await fetch(`${API_URL}/users/${uid}/roadmap`);
+
+  if (!response.ok) {
+    throw new Error('Failed to get user roadmap');
+  }
+
+  return response.json();
+}
+
+/**
+ * Complete viva exam
+ */
+export async function completeViva(data: {
+  user_id: string;
+  module_id: string;
+  final_score: number;
+  academic_dishonesty_flag?: boolean;
+  integrity_log?: string[];
+}): Promise<any> {
+  const response = await fetch(`${API_URL}/viva/complete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to complete viva');
+  }
+
+  return response.json();
+}
