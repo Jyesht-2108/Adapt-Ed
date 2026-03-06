@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dyslexia Mode Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.5;
+            background: white;
+            color: black;
+        }
+
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4A90E2;
+            padding-bottom: 10px;
+        }
+
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .instructions {
+            background: #f0f8ff;
+            padding: 15px;
+            border-left: 4px solid #4A90E2;
+            margin-bottom: 20px;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .before,
+        .after {
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        .before {
+            background: #fff;
+            border: 2px solid #ccc;
+        }
+
+        .after {
+            background: #FEFEF0;
+            border: 2px solid #27AE60;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🧪 Dyslexia Mode Test Page</h1>
+
+    <div class="instructions">
+        <h2>📋 Instructions:</h2>
+        <ol>
+            <li>Look for the <strong>"Dyslexia Mode"</strong> button in the top-right corner</li>
+            <li>The button should be <strong>BLUE/GRAY</strong> (inactive)</li>
+            <li>Click the button to enable dyslexia mode</li>
+            <li>Button should turn <strong>GREEN</strong></li>
+            <li>Observe the changes below</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>✅ What Should Change:</h2>
+        <ul>
+            <li><strong>Font:</strong> Should change to OpenDyslexic or Comic Sans MS</li>
+            <li><strong>Size:</strong> Text should be 15% larger</li>
+            <li><strong>Spacing:</strong> More space between lines, letters, and words</li>
+            <li><strong>Bold:</strong> First part of each word should be bold</li>
+            <li><strong>Background:</strong> Should become cream/beige color</li>
+            <li><strong>Text Color:</strong> Should become softer dark gray</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>📖 Sample Text for Testing:</h2>
+        <p>
+            The quick brown fox jumps over the lazy dog. This sentence contains every letter
+            of the alphabet and is perfect for testing font changes. Notice how the letters
+            look different when dyslexia mode is enabled.
+        </p>
+        <p>
+            Programming is the process of creating a set of instructions that tell a computer
+            how to perform a task. Programming can be done using a variety of computer
+            programming languages, such as JavaScript, Python, and C++.
+        </p>
+        <p>
+            Dyslexia is a learning disorder that involves difficulty reading due to problems
+            identifying speech sounds and learning how they relate to letters and words.
+            Dyslexia-friendly fonts and formatting can significantly improve reading
+            comprehension and reduce eye strain.
+        </p>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 How to Verify Changes:</h2>
+        <ol>
+            <li>Right-click on any text above</li>
+            <li>Select <strong>"Inspect"</strong></li>
+            <li>Go to the <strong>"Computed"</strong> tab</li>
+            <li>Check these properties:
+                <ul>
+                    <li><code>font-family</code> → Should be "OpenDyslexic" or "Comic Sans MS"</li>
+                    <li><code>font-size</code> → Should be ~115% of original</li>
+                    <li><code>line-height</code> → Should be 1.7</li>
+                    <li><code>letter-spacing</code> → Should be 0.05em</li>
+                    <li><code>word-spacing</code> → Should be 0.16em</li>
+                    <li><code>background-color</code> → Should be rgb(254, 254, 240)</li>
+                    <li><code>color</code> → Should be rgb(43, 43, 43)</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Expected Visual Comparison:</h2>
+        <div class="comparison">
+            <div class="before">
+                <h3>Before (Normal)</h3>
+                <p style="font-family: Arial; font-size: 16px; line-height: 1.5; letter-spacing: 0; word-spacing: 0;">
+                    This is how text looks normally. Standard font, regular spacing,
+                    uniform weight. All letters are the same.
+                </p>
+            </div>
+            <div class="after">
+                <h3>After (Dyslexia Mode)</h3>
+                <p
+                    style="font-family: 'Comic Sans MS'; font-size: 18px; line-height: 1.7; letter-spacing: 0.05em; word-spacing: 0.16em;">
+                    <b>Th</b>is <b>i</b>s <b>ho</b>w <b>te</b>xt <b>loo</b>ks <b>i</b>n
+                    <b>dys</b>lexia <b>mo</b>de. <b>Dif</b>ferent <b>fo</b>nt,
+                    <b>lar</b>ger <b>si</b>ze, <b>mo</b>re <b>spa</b>cing,
+                    <b>bo</b>ld <b>syl</b>lables.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🧪 Test Toggle Functionality:</h2>
+        <ol>
+            <li>Click the button to enable (should turn GREEN)</li>
+            <li>Observe all the changes above</li>
+            <li>Click again to disable (should turn GRAY)</li>
+            <li>Everything should return to normal</li>
+            <li>Click again to re-enable</li>
+            <li>Refresh the page (F5)</li>
+            <li>Mode should persist (still enabled after refresh)</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>✨ Success Checklist:</h2>
+        <ul>
+            <li>☐ Button is visible in top-right corner</li>
+            <li>☐ Button toggles between GRAY and GREEN</li>
+            <li>☐ Font changes when enabled</li>
+            <li>☐ Text gets larger when enabled</li>
+            <li>☐ Lines spread out more when enabled</li>
+            <li>☐ First part of words becomes bold</li>
+            <li>☐ Background becomes cream color</li>
+            <li>☐ Text color becomes softer</li>
+            <li>☐ Changes revert when disabled</li>
+            <li>☐ State persists after page refresh</li>
+        </ul>
+    </div>
+
+    <div class="test-section" style="background: #fff3cd; border-color: #ffc107;">
+        <h2>⚠️ If You Don't See Changes:</h2>
+        <ol>
+            <li>Make sure the button is <strong>GREEN</strong> (not gray)</li>
+            <li>Check browser console (F12) for errors</li>
+            <li>Verify extension is enabled in <code>chrome://extensions/</code></li>
+            <li>Try disabling and re-enabling the extension</li>
+            <li>Make sure you have internet connection (for font CDN)</li>
+            <li>Try on a different webpage (Wikipedia works great)</li>
+        </ol>
+    </div>
+
+    <div class="test-section" style="background: #d4edda; border-color: #28a745;">
+        <h2>✅ If Everything Works:</h2>
+        <p>
+            Congratulations! Your dyslexia mode is working correctly. The extension is:
+        </p>
+        <ul>
+            <li>✅ Applying OpenDyslexic font</li>
+            <li>✅ Increasing text size by 15%</li>
+            <li>✅ Adding proper spacing</li>
+            <li>✅ Implementing bionic reading (bold syllables)</li>
+            <li>✅ Using softer colors</li>
+            <li>✅ Persisting state across reloads</li>
+        </ul>
+        <p>
+            <strong>This is a fully functional, research-based dyslexia-friendly implementation!</strong>
+        </p>
+    </div>
+
+</body>
+
+</html>
