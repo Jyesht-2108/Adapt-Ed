@@ -1,0 +1,71 @@
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║                                                                       ║
+║   ███╗   ███╗ ██████╗██████╗       ██╗██████╗ ███████╗              ║
+║   ████╗ ████║██╔════╝██╔══██╗      ██║██╔══██╗██╔════╝              ║
+║   ██╔████╔██║██║     ██████╔╝█████╗██║██║  ██║█████╗                ║
+║   ██║╚██╔╝██║██║     ██╔═══╝ ╚════╝██║██║  ██║██╔══╝                ║
+║   ██║ ╚═╝ ██║╚██████╗██║           ██║██████╔╝███████╗              ║
+║   ╚═╝     ╚═╝ ╚═════╝╚═╝           ╚═╝╚═════╝ ╚══════╝              ║
+║                                                                       ║
+║              Context-Aware AI Coding Tutor                           ║
+║                                                                       ║
+║   🎓 Educational Focus  |  🔒 Privacy-First  |  ⚡ Local LLM         ║
+║                                                                       ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  Built for AdaptEd                                                  │
+│  Version 1.0.0                                                      │
+│                                                                     │
+│  📚 Docs: See README.md                                             │
+│  🚀 Start: run start-dev.bat (Windows) or ./start-dev.sh (Linux)   │
+│  🌐 URL: http://localhost:5174                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+Features:
+  ✓ Monaco Editor (VS Code in browser)
+  ✓ Real-time context capture
+  ✓ Socratic AI tutoring
+  ✓ Local LLM (Ollama)
+  ✓ Educational guardrails
+  ✓ Privacy-preserving
+
+Tech Stack:
+  Frontend:  React 19 + TypeScript + Monaco Editor
+  Backend:   FastAPI + Python + Ollama
+  AI:        Llama 3 (Local)
+  Styling:   Tailwind CSS
+
+Quick Commands:
+  Backend:   cd backend && python main.py
+  Frontend:  cd frontend && npm run dev
+  Health:    curl http://localhost:8000/health
+  Ollama:    ollama list
+
+Documentation:
+  📖 README.md              - Project overview
+  🔧 SETUP.md               - Setup instructions
+  🔗 INTEGRATION.md         - Integration guide
+  📊 PROJECT_SUMMARY.md     - Complete overview
+  🏗️  ARCHITECTURE_DIAGRAM.md - Visual architecture
+  ✅ TEAM_CHECKLIST.md      - Onboarding checklist
+  ⚡ QUICK_REFERENCE.md     - Quick tips
+  🎬 DEMO_SCRIPT.md         - Presentation guide
+  📦 HANDOFF_SUMMARY.md     - Handoff document
+
+Need Help?
+  1. Check QUICK_REFERENCE.md for commands
+  2. Review SETUP.md for troubleshooting
+  3. Read PROJECT_SUMMARY.md for overview
+  4. See ARCHITECTURE_DIAGRAM.md for design
+
+Ready to Start?
+  Windows:     start-dev.bat
+  macOS/Linux: ./start-dev.sh
+
+═══════════════════════════════════════════════════════════════════════
+
+  "Teaching students to think, not just to code"
+
+═══════════════════════════════════════════════════════════════════════
