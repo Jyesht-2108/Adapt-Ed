@@ -1,22 +1,26 @@
-import google.generativeai as genai
-from models import LessonContent, StudyNotes, Source
-import os
+"""
+Study Notes Generator Agent using AWS Bedrock (Claude 3)
+Transforms lesson content into comprehensive study notes
+"""
 import json
+from models import LessonContent, StudyNotes, Source
+from aws_config import get_bedrock_client, BEDROCK_MODEL_ID
 
 
 class NotesGeneratorAgent:
     """
-    AI-powered agent that transforms lesson content into comprehensive study notes.
+    AI-powered agent using AWS Bedrock (Claude 3) that transforms 
+    lesson content into comprehensive study notes.
     """
     
     def __init__(self):
-        """Initialize the Gemini model for notes generation."""
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        """Initialize the AWS Bedrock client for notes generation."""
+        self.bedrock_client = get_bedrock_client()
+        self.model_id = BEDROCK_MODEL_ID
     
     async def generate_study_notes(self, lesson: LessonContent) -> StudyNotes:
         """
-        Generate comprehensive study notes from lesson content.
+        Generate comprehensive study notes from lesson content using AWS Bedrock.
         
         Args:
             lesson: The original lesson content
@@ -94,11 +98,36 @@ CRITICAL REQUIREMENTS:
 
 Generate the comprehensive study notes:"""
         
-        # Generate notes
-        response = self.model.generate_content(prompt)
+        # Prepare request for Claude 3 via AWS Bedrock
+        request_body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 4000,
+            "temperature": 0.7,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        }
         
-        # Parse and validate response
-        return self._parse_notes_response(response.text, lesson)
+        try:
+            # Call AWS Bedrock
+            response = self.bedrock_client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps(request_body)
+            )
+            
+            # Parse response
+            response_body = json.loads(response['body'].read())
+            content = response_body['content'][0]['text'].strip()
+            
+            # Parse and validate response
+            return self._parse_notes_response(content, lesson)
+            
+        except Exception as e:
+            print(f"Error generating study notes via AWS Bedrock: {e}")
+            return self._create_fallback_notes(lesson)
     
     def _parse_notes_response(self, response_text: str, lesson: LessonContent) -> StudyNotes:
         """

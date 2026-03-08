@@ -1,21 +1,25 @@
-import google.generativeai as genai
-from models import LessonContent, Source
-from tools import ContentResult
-import os
+"""
+Content Refinery Agent using AWS Bedrock (Claude 3)
+Synthesizes educational content from multiple sources with attribution
+"""
 import json
-from typing import List, Dict
+from models import LessonContent, Source, CodeSnippet
+from tools import ContentResult
+from typing import List
+from aws_config import get_bedrock_client, BEDROCK_MODEL_ID
 
 
 class ContentRefineryAgent:
     """
-    AI-powered content refinery that transforms raw educational content 
-    into structured, high-quality micro-lessons with multi-source attribution.
+    AI-powered content refinery using AWS Bedrock (Claude 3) that transforms 
+    raw educational content into structured, high-quality micro-lessons with 
+    multi-source attribution.
     """
     
     def __init__(self):
-        """Initialize the Gemini model for content synthesis."""
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        """Initialize the AWS Bedrock client for content synthesis."""
+        self.bedrock_client = get_bedrock_client()
+        self.model_id = BEDROCK_MODEL_ID
     
     async def synthesize_lesson(
         self, 
@@ -24,7 +28,7 @@ class ContentRefineryAgent:
         user_preference: str
     ) -> LessonContent:
         """
-        Synthesize a structured lesson from multiple content sources.
+        Synthesize a structured lesson from multiple content sources using AWS Bedrock.
         
         Args:
             topic: The topic of the lesson
@@ -52,185 +56,210 @@ class ContentRefineryAgent:
         user_preference: str
     ) -> LessonContent:
         """
-        Convert multiple content sources into a structured lesson with attribution.
+        Convert multiple content sources into a strution.
         
         Args:
-            topic: The topic of the lesson
+            topi lesson
             content_results: List of content sources
-            user_preference: Learning style preference
+           ence
             
         Returns:
-            LessonContent: Structured lesson with sources
+        
         """
         # Build source context for the prompt
-        source_context = self._build_source_context(content_results)
+        )
         
         # Build sources list for JSON output
-        sources_json = self._build_sources_json(content_results)
+        
         
         # Determine style adaptation based on user preference
-        style_instruction = self._get_style_instruction(user_preference)
+
         
-        # Create the system prompt with Perplexity-style attribution
-        system_prompt = f"""You are an expert technical educator specializing in creating structured learning content with proper source attribution.
+ion
+        prompttion.
 
-ROLE: Synthesize educational content from multiple sources into a professional, structured guide.
+ROLE: Synthesize education
 
-TOPIC: {topic}
+topic}
 
 SOURCE MATERIALS PROVIDED:
 {source_context}
 
 TASK:
-1. Synthesize information from ALL provided sources into a comprehensive lesson
-2. Remove conversational filler and redundancy
-3. Be concise and professional
+n
+2. Remove conversatncy
+nal
 4. Focus on teaching the core concepts effectively
 
 {style_instruction}
 
-CRITICAL ATTRIBUTION REQUIREMENTS (Perplexity-Style):
-1. Every time you explain a key concept, attribute it to one of the sources
-2. Use the source index (0, 1, 2, etc.) to reference sources
-3. In the `citation_map`, map key concepts to their source indices
+CRITICAL ATTRIBUTION REQUIREMENTS (PerplStyle):
+1. Every time you explain a key concept, attribute it
+ces
+3. In the `citindices
 4. Do NOT hallucinate or invent new URLs
-5. ONLY use the sources provided in the context above
+5.ove
 
 OUTPUT FORMAT:
-You MUST return a valid JSON object with this EXACT structure:
+You MUST return a vure:
 {{
-  "title": "Clear, descriptive title for the lesson",
-  "summary": "A concise 2-sentence summary of what this lesson covers",
+  "title": "Clear, descriptive title fo",
+  "summary": "A concise 2-sentence sum",
   "key_concepts": [
     "First core concept or principle",
-    "Second core concept or principle",
+    ,
     "Third core concept or principle",
-    "Fourth core concept (if applicable)",
+    "Fourth core con
     "Fifth core concept (if applicable)"
   ],
-  "main_content": "# Main Title\\n\\nDetailed educational content in **Markdown** format. Use headers (##), bold text for emphasis, code blocks with ```language```, and clear paragraphs. Make it comprehensive but concise (300-500 words).",
+  "m
   "code_snippets": [
-    {{"language": "python", "code": "# Example code here\\nprint('Hello')"}},
-    {{"language": "bash", "code": "docker run -it ubuntu"}}
+    {{"language": "python", ')"}},
+    {{"language": "b
   ],
-  "quiz_question": "A conceptual multiple-choice question to test understanding. Format: 'Question text? A) Option 1 B) Option 2 C) Option 3 D) Option 4'",
+  "quiz_question": "A concep",
   "sources": {sources_json},
-  "citation_map": {{
-    "First key concept": 0,
-    "Second key concept": 1,
-    "Third key concept": 0
+  "c
+  t": 0,
+
+    "Third key c: 0
   }}
 }}
 
 IMPORTANT RULES:
-- Return ONLY the JSON object, no additional text
+- Return ONLY the JSON object, no additional
 - Ensure all JSON is properly escaped
 - Include 3-5 key concepts
 - Include 2-5 code snippets (if applicable to the topic)
 - If no code is relevant, use empty array []
-- Main content should be 300-500 words in Markdown format
+at
 - Quiz question must be multiple choice with 4 options
-- Sources array MUST match the provided sources exactly
-- Citation map should link at least 3 key concepts to sources
+- Source
+- Citation map should linkces
 
-Generate the structured lesson with proper attribution:"""
+Generate
         
-        # Generate content
-        response = self.model.generate_content(system_prompt)
+        # Prepare request for Claude 3 via AWS Bedrock
+    _body = {
+            "anthropic_version": "bedrock-2023-05-31",
+           00,
+            "temperature": 0.7,
         
-        # Parse and validate response
-        return self._parse_lesson_response(response.text, topic, content_results)
-    
-    def _build_source_context(self, content_results: List[ContentResult]) -> str:
-        """
-        Build formatted source context for the prompt.
+              {
+                    "role": "user",
+            ompt
+                
+            ]
+        }
         
-        Args:
-            content_results: List of content sources
+        y:
+            # Call AWS Bedrock
+            response = self.bedrock_client.invoke_model(
+                modelId=self.mode_id,
+                body=json.dumps(request_body)
+            )
             
-        Returns:
-            Formatted string with all sources
-        """
-        context_parts = []
+            #ponse
+        ))
+            content = response_body['co()
+         
+            # Parse and validate response
+           
+            
+        s e:
+            ps: {e}")
+            return self._create_fallback_lesson(topilts)
+    
+    def _build_s str:
+        """Build formatted source context for the promp"
+        conarts = []
         
-        for idx, result in enumerate(content_results):
-            source_type = result.source_type.capitalize()
+        for idx, result in enumerate(clts):
+            source_type = rlize()
             context_parts.append(
-                f"[Source {idx}] ({source_type}): {result.title}\n"
+                f"[Source {idx}] (}\n"
                 f"URL: {result.url}\n"
-                f"Content: {result.text[:3000]}...\n"  # Limit each source to 3000 chars
+             
             )
         
-        return "\n".join(context_parts)
+        return "\n".join(contexparts)
     
-    def _build_sources_json(self, content_results: List[ContentResult]) -> str:
-        """
-        Build JSON array string for sources.
-        
-        Args:
-            content_results: List of content sources
-            
-        Returns:
-            JSON string representation of sources array
-        """
-        sources = []
-        for result in content_results:
-            source_dict = {
+    def _bui
+        """Build JSON array string for "
+        rces = []
+        for result in content_resu:
+     = {
                 "title": result.title,
-                "url": result.url,
-                "type": result.source_type
+              
+                "typce_type
             }
             
-            # Add metadata if available
-            if result.metadata:
+           ta:
                 source_dict["metadata"] = result.metadata
-            
-            sources.append(source_dict)
+           
+            s
         
         return json.dumps(sources)
     
-    async def _generate_fallback_lesson(
+    async def _g
         self, 
-        topic: str, 
+        top 
         user_preference: str
-    ) -> LessonContent:
-        """
-        Generate a lesson from internal knowledge when no sources are available.
+    ) ->:
+        """Generate a lesson from internal knowledge when no sources are available."""
+ce)
         
-        Args:
-            topic: The topic to teach
-            user_preference: Learning style preference
-            
-        Returns:
-            LessonContent: Generated lesson
-        """
-        style_instruction = self._get_style_instruction(user_preference)
-        
-        prompt = f"""You are an expert technical educator. Create a comprehensive lesson about: {topic}
+ic}
 
-{style_instruction}
+{s
 
 You MUST return a valid JSON object with this EXACT structure:
 {{
-  "title": "Clear, descriptive title for the lesson",
-  "summary": "A concise 2-sentence summary of what this lesson covers",
+  "title": "Clear, descrisson",
+  "summary": "A concise 2-
   "key_concepts": [
     "First core concept",
-    "Second core concept",
-    "Third core concept",
+    "Second core concept
+    ",
     "Fourth core concept",
-    "Fifth core concept"
+    "Fifth core conct"
   ],
-  "main_content": "# Main Title\\n\\nDetailed educational content in **Markdown** format. Use headers (##), bold text, code blocks, and clear paragraphs. Make it comprehensive (300-500 words).",
-  "code_snippets": [
+  "main_content": "# Main Title\\n\\nDetailed education).",
+  "c": [
     {{"language": "python", "code": "# Example code"}},
-    {{"language": "bash", "code": "# Command example"}}
+    {{"languag"}}
+  ],
+  "quiz_question": "A conceptual multi",
+  "sources": [
+    {{
+      
+    drock",
+      "type": "documen"
+  }
+  ],
+  "citation_mull
+}}
+
+REQUIREMENTS:
+- Return ONLY the JSON object
+- Include 3-5 key concepts
+
+- Main content should bkdown
+- Quiz mions
+
+Generate the lesson:"""
+      
+        request_body = {
+           ,
+            "max_tokens": 4000,
+         0.7,
+            "": [: "# Command example"}}
   ],
   "quiz_question": "A conceptual multiple-choice question. Format: 'Question? A) Option 1 B) Option 2 C) Option 3 D) Option 4'",
   "sources": [
     {{
-      "title": "AI Generated Content",
-      "url": "Generated from AI knowledge",
+      "title": "AI Generated Content via AWS Bedrock",
+      "url": "Generated from Claude 3 knowledge",
       "type": "documentation"
     }}
   ],
@@ -246,8 +275,35 @@ REQUIREMENTS:
 
 Generate the lesson:"""
         
-        response = self.model.generate_content(prompt)
-        return self._parse_lesson_response(response.text, topic, [])
+        # Prepare request for Claude 3 via AWS Bedrock
+        request_body = {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 4000,
+            "temperature": 0.7,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        }
+        
+        try:
+            # Call AWS Bedrock
+            response = self.bedrock_client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps(request_body)
+            )
+            
+            # Parse response
+            response_body = json.loads(response['body'].read())
+            content = response_body['content'][0]['text'].strip()
+            
+            return self._parse_lesson_response(content, topic, [])
+            
+        except Exception as e:
+            print(f"Error generating fallback lesson via AWS Bedrock: {e}")
+            return self._create_fallback_lesson(topic, [])
     
     def _get_style_instruction(self, user_preference: str) -> str:
         """
@@ -362,8 +418,8 @@ Generate the lesson:"""
                 ))
         else:
             sources.append(Source(
-                title="AI Generated Content",
-                url="Generated from AI knowledge",
+                title="AI Generated Content via AWS Bedrock",
+                url="Generated from Claude 3 knowledge",
                 type="documentation",
                 metadata=None
             ))
@@ -384,4 +440,3 @@ Generate the lesson:"""
             sources=sources,
             citation_map=None
         )
-

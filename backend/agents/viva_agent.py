@@ -1,284 +1,403 @@
 """
-Viva Agent using Google Gemini 1.5 Flash with JSON output
-Fixes cut-off and scoring issues with structured responses
+Viva Voce Agent using AWS Services
+- AWS Bedrock (Claude 3) for conversation logic
+- AWS Transcribe for speech-to-text
+- AWS Polly for text-to-speech
 """
-import os
 import json
-import google.generativeai as genai
-
-# Setup Model configuration with JSON output
-generation_config = {
-    "temperature": 0.7,
-    "max_output_tokens": 500,
-    "top_p": 0.95,
-    "top_k": 40,
-    "response_mime_type": "application/json",
-}
-
-# Model instance (lazy initialization)
-_model = None
-
-def _get_model():
-    """Lazy initialization of the Gemini model with API key configuration."""
-    global _model
-    if _model is None:
-        # Configure API key
-        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY environment variable is required")
-        
-        genai.configure(api_key=api_key)
-        _model = genai.GenerativeModel('gemini-2.5-flash', generation_config=generation_config)
-    
-    return _model
+import os
+import uuid
+import time
+from typing import List, Dict, Tuple
+from datetime import datetime
+from aws_config import (
+    get_bedrock_client, 
+    get_transcribe_client, 
+    get_polly_client,
+    get_s3_client,
+    BEDROCK_MODEL_ID,
+    POLLY_VOICE_ID,
+    POLLY_ENGINE,
+    S3_AUDIO_BUCKET,
+    AWS_REGION
+)
 
 
-def get_interviewer_response(history, user_input, module_topic, target_role="Senior Tech Lead"):
+class VivaAgent:
     """
-    Generates a response with feedback and next question using JSON output.
-    
-    Args:
-        history: List of previous messages [{'role': 'user', 'content': '...'}, ...]
-        user_input: The candidate's latest answer
-        module_topic: The topic being tested (e.g., "Git Basics")
-        target_role: The interviewer persona (default: "Senior Tech Lead")
-        
-    Returns:
-        tuple: (combined_response_text, score_update)
-            - combined_response_text: "feedback next_question" for speech
-            - score_update: int (0-100) or -1 if no grading
+    AI-powered technical interviewer for Viva Voce examinations using AWS services.
+    - AWS Bedrock (Claude 3) for intelligent conversation
+    - AWS Transcribe for speech-to-text
+    - AWS Polly for text-to-speech
     """
-    # Build the system prompt
-    system_prompt = f"""ACT AS: {target_role} conducting a viva exam.
-TOPIC: {module_topic}.
+    
+    def __init__(self):
+        """Initialize the Viva Agent with AWS clients."""
+        self.bedrock_client = get_bedrock_client()
+        self.transcribe_client = get_transcribe_client()
+        self.polly_client = get_polly_client()
+        self.s3_client = get_s3_client()
+        self.model_id = BEDROCK_MODEL_ID
+    
+    def generate_initial_question(
+        self, 
+        module_title: str, 
+        module_description: str = None,
+        user_goal: str = None
+    ) -> str:
+        """
+        Generate the first question to start the viva using AWS Bedrock (Claude 3).
+        
+        Args:
+            module_title: Title of the module being tested
+            module_description: Optional description for context
+            user_goal: User's learning goal (e.g., "Full Stack Developer")
+            
+        Returns:
+            Initial greeting and question
+        """
+        context = f"Module: {module_title}"
+        if module_description:
+            context += f"\nDescription: {module_description}"
+        
+        # Determine interviewer persona based on user goal
+        persona = "Senior Software Engineer"
+        if user_goal:
+            goal_lower = user_goal.lower()
+            if "backend" in goal_lower:
+                persona = "Senior Backend Engineer"
+            elif "frontend" in goal_lower or "react" in goal_lower:
+                persona = "Senior Frontend Engineer"
+            elif "full stack" in goal_lower or "fullstack" in goal_lower:
+                persona = "Full Stack Architect"
+            elif "devops" in goal_lower or "cloud" in goal_lower:
+                persona = "DevOps Evangelist"
+            elif "data" in goal_lower or "ml" in goal_lower or "ai" in goal_lower:
+                persona = "Senior Data Engineer"
+            elif "mobile" in goal_lower:
+                persona = "Senior Mobile Developer"
+        
+        prompt = f"""You are a {persona} conducting a friendly but professional technical interview (Viva Voce).
 
-INPUT: User's latest voice text.
+{context}
 
-TASK:
-1. Analyze the input.
-2. If the input is just 'Continue', 'Next', 'Start', or similar non-answer, DO NOT GRADE IT. Just ask the next question.
-3. If it's an actual answer, grade it (0-100).
-4. Generate a 'feedback' sentence (brief, 1 sentence).
-5. Generate the 'next_question' (1 sentence).
+Your personality:
+- Warm and approachable, like a senior colleague mentoring a junior
+- Professional but conversational - talk like you're having coffee with a friend
+- Encouraging and supportive, but still thorough
+- Use casual language occasionally ("Hey", "Alright", "Cool", "Got it")
+- Show genuine interest in their answers
 
-OUTPUT JSON SCHEMA:
+Your task: Greet them warmly and ask the FIRST question.
+
+Guidelines:
+- Start with a friendly greeting (e.g., "Hey! Ready to dive into {module_title}?")
+- Introduce yourself briefly as a {persona}
+- Ask ONE fundamental question to start
+- Keep it conversational (3-4 sentences max)
+- Make it open-ended to gauge their understanding
+
+Example tone: "Hey there! I'm Alex, a {persona}. I'm excited to chat with you about {module_title} today. Let's start with something fundamental - can you walk me through..."
+
+Output ONLY the greeting and first question as plain text. Do NOT use markdown or formatting."""
+
+        try:
+            # Prepare request for Claude 3 via AWS Bedrock
+            request_body = {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 300,
+                "temperature": 0.8,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            }
+            
+            # Call AWS Bedrock
+            response = self.bedrock_client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps(request_body)
+            )
+            
+            # Parse response
+            response_body = json.loads(response['body'].read())
+            content = response_body['content'][0]['text'].strip()
+            
+            return content
+            
+        except Exception as e:
+            print(f"Error generating initial question via AWS Bedrock: {e}")
+            return f"Hey there! I'm excited to chat with you about {module_title} today. Let's start with the basics - can you walk me through what this module is all about and why it's important?"
+    
+    def generate_viva_response(
+        self,
+        history: List[Dict[str, str]],
+        user_input: str,
+        module_context: str
+    ) -> Tuple[str, int]:
+        """
+        Generate interviewer's response and score update using AWS Bedrock (Claude 3).
+        
+        Args:
+            history: List of previous messages [{"role": "user/interviewer", "content": "..."}]
+            user_input: User's latest answer
+            module_context: Context about the module being tested
+            
+        Returns:
+            Tuple of (response_text, score_update)
+        """
+        # Build conversation history
+        conversation_text = ""
+        for msg in history[-6:]:  # Last 6 messages for context
+            role = "Interviewer" if msg["role"] == "interviewer" else "Candidate"
+            conversation_text += f"{role}: {msg['content']}\n\n"
+        
+        conversation_text += f"Candidate: {user_input}\n\n"
+        
+        prompt = f"""You are a friendly, conversational Technical Interviewer conducting a Viva Voce examination.
+
+Module Context: {module_context}
+
+Conversation so far:
+{conversation_text}
+
+Your personality:
+- Talk like a supportive senior colleague, not a strict examiner
+- Use conversational language ("Nice!", "I see what you mean", "That's a good point", "Hmm, interesting")
+- Show genuine interest in their answers
+- Be encouraging even when correcting mistakes
+- Keep the vibe professional but relaxed - like a technical discussion over coffee
+
+Your responsibilities:
+1. React naturally to their answer (acknowledge it first)
+2. Evaluate the answer fairly
+3. Ask ONE follow-up question or move to the next concept
+4. If vague: "That's a start! Can you dive deeper into X?"
+5. If wrong: "I see where you're going, but actually... [brief correction]. Let's move on to..."
+6. Keep responses conversational and concise (2-4 sentences)
+7. Vary your responses - don't sound robotic
+
+CRITICAL: You MUST respond with VALID JSON in this exact format:
 {{
-  "feedback": "string - Brief feedback on the answer. If no answer, say 'Let's continue.'",
-  "next_question": "string - The next technical question to ask",
-  "score_update": number - Score 0-100 for the answer. Return -1 if no grading occurred (skip/continue/start)
+    "response_text": "Your spoken reply to the candidate (conversational tone)",
+    "score_update": <number between -10 and +10>
 }}
 
-RULES:
-- Keep feedback under 15 words
-- Keep next_question under 20 words
-- NO markdown, NO bullet points
-- Be direct and technical
-- ALWAYS include a next_question
-- If user says "continue" or "next", set score_update to -1
+Score Guidelines:
+- Excellent answer with depth: +8 to +10
+- Good answer, correct: +5 to +7
+- Partially correct: +2 to +4
+- Vague but on track: 0 to +1
+- Incorrect but trying: -2 to 0
+- Completely wrong: -5 to -2
+- No answer/off-topic: -8 to -5
 
-EXAMPLES:
+Remember: Output ONLY valid JSON, nothing else. Keep the tone friendly and conversational."""
 
-Input: "Git is a version control system"
-Output: {{"feedback": "Correct.", "next_question": "What is the difference between git add and git commit?", "score_update": 85}}
-
-Input: "I don't know"
-Output: {{"feedback": "That's okay.", "next_question": "Let me ask differently. What does git init do?", "score_update": 20}}
-
-Input: "Continue"
-Output: {{"feedback": "Let's continue.", "next_question": "What is a git branch?", "score_update": -1}}
-
-Input: "A commit saves changes to the remote repository"
-Output: {{"feedback": "Not quite. Commit saves to local repo, not remote.", "next_question": "What command pushes to remote?", "score_update": 40}}
-"""
-
-    # Build context with conversation history
-    context_text = system_prompt + "\n\nCONVERSATION HISTORY:\n"
+        try:
+            # Prepare request for Claude 3 via AWS Bedrock
+            request_body = {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 400,
+                "temperature": 0.8,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            }
+            
+            # Call AWS Bedrock
+            response = self.bedrock_client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps(request_body)
+            )
+            
+            # Parse response
+            response_body = json.loads(response['body'].read())
+            content = response_body['content'][0]['text'].strip()
+            
+            # Parse JSON response
+            try:
+                # Remove markdown code blocks if present
+                if content.startswith("```json"):
+                    content = content.replace("```json", "").replace("```", "").strip()
+                elif content.startswith("```"):
+                    content = content.replace("```", "").strip()
+                
+                result = json.loads(content)
+                response_text = result.get("response_text", "")
+                score_update = int(result.get("score_update", 0))
+                
+                # Clamp score update to valid range
+                score_update = max(-10, min(10, score_update))
+                
+                return response_text, score_update
+                
+            except json.JSONDecodeError as e:
+                print(f"JSON parse error: {e}")
+                print(f"Raw content: {content}")
+                # Fallback response
+                return "I see. Let me ask you another question to better assess your understanding.", 0
+                
+        except Exception as e:
+            print(f"Error generating viva response via AWS Bedrock: {e}")
+            # Fallback response
+            return "Thank you for your answer. Let's continue with the next question.", 0
     
-    # Add last 3 turns for context
-    for msg in history[-3:]:
-        role_label = "Candidate" if msg['role'] == 'user' else "Interviewer"
-        content = msg.get('content', '') or msg.get('parts', [''])[0] if isinstance(msg.get('parts'), list) else ''
-        context_text += f"{role_label}: {content}\n"
-    
-    context_text += f"\nCURRENT INPUT: {user_input}\n\nGenerate JSON response:"
-
-    # Generate response
-    model = _get_model()
-    response = model.generate_content(context_text)
-    
-    # Parse JSON response
-    try:
-        result = json.loads(response.text)
-        feedback = result.get("feedback", "Let's continue.")
-        next_question = result.get("next_question", "What's your understanding of this topic?")
-        score_update = result.get("score_update", -1)
+    def generate_final_feedback(
+        self,
+        score: int,
+        passed: bool,
+        module_title: str,
+        transcript: List[Dict[str, str]]
+    ) -> str:
+        """
+        Generate final feedback using AWS Bedrock (Claude 3).
         
-        # Combine for speech output
-        combined_text = f"{feedback} {next_question}"
+        Args:
+            score: Final score (0-100)
+            passed: Whether the candidate passed
+            module_title: Module title
+            transcript: Full conversation history
+            
+        Returns:
+            Final feedback message
+        """
+        result = "passed" if passed else "failed"
         
-        return combined_text, score_update
+        prompt = f"""You are a Technical Interviewer concluding a Viva Voce examination.
+
+Module: {module_title}
+Final Score: {score}/100
+Result: {result.upper()}
+
+Provide brief, constructive feedback (2-3 sentences):
+- If passed: Congratulate them warmly and mention 1-2 strengths
+- If failed: Be encouraging, mention what to improve, stay positive
+
+Keep it professional, motivating, and conversational. Output ONLY the feedback text, no formatting."""
+
+        try:
+            # Prepare request for Claude 3 via AWS Bedrock
+            request_body = {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 200,
+                "temperature": 0.7,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            }
+            
+            # Call AWS Bedrock
+            response = self.bedrock_client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps(request_body)
+            )
+            
+            # Parse response
+            response_body = json.loads(response['body'].read())
+            content = response_body['content'][0]['text'].strip()
+            
+            return content
+            
+        except Exception as e:
+            print(f"Error generating final feedback via AWS Bedrock: {e}")
+            if passed:
+                return f"Congratulations! You've passed the viva with a score of {score}/100. Well done!"
+            else:
+                return f"You scored {score}/100. Keep studying and you'll do better next time!"
+    
+    def transcribe_audio(self, audio_file) -> str:
+        """
+        Transcribe audio to text using AWS Transcribe.
         
-    except json.JSONDecodeError as e:
-        print(f"JSON parsing error: {e}")
-        print(f"Raw response: {response.text}")
-        # Fallback response
-        return "Let's continue. Can you explain that in more detail?", -1
-
-
-def generate_initial_question(module_topic, user_goal=None):
-    """
-    Generate the opening question using JSON output.
+        Args:
+            audio_file: Audio file object
+            
+        Returns:
+            Transcribed text
+        """
+        try:
+            # Generate unique job name
+            job_name = f"viva-transcribe-{uuid.uuid4()}"
+            
+            # Upload audio to S3
+            s3_key = f"transcribe-input/{job_name}.wav"
+            self.s3_client.upload_fileobj(audio_file, S3_AUDIO_BUCKET, s3_key)
+            
+            # Start transcription job
+            self.transcribe_client.start_transcription_job(
+                TranscriptionJobName=job_name,
+                Media={'MediaFileUri': f's3://{S3_AUDIO_BUCKET}/{s3_key}'},
+                MediaFormat='wav',
+                LanguageCode='en-US'
+            )
+            
+            # Wait for completion (polling)
+            max_tries = 60
+            while max_tries > 0:
+                max_tries -= 1
+                status = self.transcribe_client.get_transcription_job(
+                    TranscriptionJobName=job_name
+                )
+                job_status = status['TranscriptionJob']['TranscriptionJobStatus']
+                
+                if job_status == 'COMPLETED':
+                    # Get transcript
+                    transcript_uri = status['TranscriptionJob']['Transcript']['TranscriptFileUri']
+                    import requests
+                    transcript_response = requests.get(transcript_uri)
+                    transcript_data = transcript_response.json()
+                    transcript_text = transcript_data['results']['transcripts'][0]['transcript']
+                    
+                    # Cleanup
+                    self.transcribe_client.delete_transcription_job(TranscriptionJobName=job_name)
+                    self.s3_client.delete_object(Bucket=S3_AUDIO_BUCKET, Key=s3_key)
+                    
+                    return transcript_text
+                    
+                elif job_status == 'FAILED':
+                    raise Exception("Transcription job failed")
+                
+                time.sleep(2)
+            
+            raise Exception("Transcription job timed out")
+            
+        except Exception as e:
+            print(f"Error transcribing audio via AWS Transcribe: {e}")
+            raise
     
-    Args:
-        module_topic: Topic to test (e.g., "Git Basics")
-        user_goal: User's learning goal (optional)
+    def text_to_speech(self, text: str) -> bytes:
+        """
+        Convert text to speech using AWS Polly.
         
-    Returns:
-        str: Opening question
-    """
-    target_role = "Senior Tech Lead"
-    if user_goal:
-        goal_lower = user_goal.lower()
-        if "backend" in goal_lower:
-            target_role = "Senior Backend Engineer"
-        elif "frontend" in goal_lower:
-            target_role = "Senior Frontend Engineer"
-        elif "full stack" in goal_lower:
-            target_role = "Full Stack Architect"
-    
-    prompt = f"""You are a {target_role} conducting a technical viva voce exam on {module_topic}.
-
-Generate a direct opening question. Jump straight to the technical question.
-
-OUTPUT JSON SCHEMA:
-{{
-  "question": "string - A direct technical question about {module_topic}"
-}}
-
-RULES:
-- NO greetings like "Hello" or "Welcome"
-- Keep it under 20 words
-- Make it fundamental/basic to start
-- NO markdown
-
-EXAMPLE:
-{{"question": "What is the core purpose of {module_topic}?"}}
-
-Generate JSON:"""
-
-    # Generate
-    model = _get_model()
-    response = model.generate_content(prompt)
-    
-    try:
-        result = json.loads(response.text)
-        return result.get("question", f"What is {module_topic}?")
-    except json.JSONDecodeError:
-        # Fallback
-        return f"What is the main purpose of {module_topic}?"
-
-
-def generate_final_feedback(total_score, module_topic):
-    """
-    Generate final feedback using JSON output.
-    
-    Args:
-        total_score: Average score (0-100)
-        module_topic: Topic that was tested
-        
-    Returns:
-        str: Final feedback
-    """
-    passed = total_score >= 60
-    result = "PASSED" if passed else "FAILED"
-    
-    prompt = f"""You are concluding a technical viva voce exam on {module_topic}.
-
-Final Score: {total_score}/100
-Result: {result}
-
-OUTPUT JSON SCHEMA:
-{{
-  "feedback": "string - Brief final feedback (2 sentences max)"
-}}
-
-RULES:
-- If PASSED: Acknowledge competence
-- If FAILED: State what needs improvement
-- NO markdown
-- Keep it under 30 words
-- Be direct and professional
-
-EXAMPLE (PASSED):
-{{"feedback": "You demonstrated solid understanding of {module_topic}. Keep practicing to master advanced concepts."}}
-
-EXAMPLE (FAILED):
-{{"feedback": "You need to review the fundamentals of {module_topic}. Focus on core concepts and try again."}}
-
-Generate JSON:"""
-
-    # Generate
-    model = _get_model()
-    response = model.generate_content(prompt)
-    
-    try:
-        result = json.loads(response.text)
-        return result.get("feedback", f"Your final score is {total_score}/100.")
-    except json.JSONDecodeError:
-        # Fallback
-        if passed:
-            return f"You passed with {total_score}/100. Well done!"
-        else:
-            return f"You scored {total_score}/100. Review the material and try again."
-
-
-def evaluate_answer(user_text, module_topic):
-    """
-    Evaluate answer and return score using JSON output.
-    
-    Args:
-        user_text: User's answer
-        module_topic: Topic being tested
-        
-    Returns:
-        int: Score from 0-100
-    """
-    prompt = f"""You are evaluating a technical answer on {module_topic}.
-
-Answer: "{user_text}"
-
-OUTPUT JSON SCHEMA:
-{{
-  "score": number - Integer between 0 and 100
-}}
-
-SCORING GUIDE:
-- 80-100: Excellent, detailed, accurate
-- 60-79: Good, correct
-- 40-59: Partially correct
-- 20-39: Incorrect but shows effort
-- 0-19: Wrong or no answer
-
-EXAMPLES:
-Answer: "Git is a distributed version control system"
-Output: {{"score": 90}}
-
-Answer: "I don't know"
-Output: {{"score": 0}}
-
-Answer: "Git saves files"
-Output: {{"score": 45}}
-
-Generate JSON with score only:"""
-
-    # Generate
-    model = _get_model()
-    response = model.generate_content(prompt)
-    
-    try:
-        result = json.loads(response.text)
-        score = result.get("score", 50)
-        return max(0, min(100, int(score)))
-    except (json.JSONDecodeError, ValueError):
-        # Fallback
-        return 50
+        Args:
+            text: Text to convert
+            
+        Returns:
+            Audio bytes
+        """
+        try:
+            response = self.polly_client.synthesize_speech(
+                Text=text,
+                OutputFormat='mp3',
+                VoiceId=POLLY_VOICE_ID,
+                Engine=POLLY_ENGINE
+            )
+            
+            # Read audio stream
+            audio_stream = response['AudioStream']
+            audio_bytes = audio_stream.read()
+            
+            return audio_bytes
+            
+        except Exception as e:
+            print(f"Error generating speech via AWS Polly: {e}")
+            raise

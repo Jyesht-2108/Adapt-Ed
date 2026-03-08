@@ -1,12 +1,16 @@
-import google.generativeai as genai
-from models import UserProfile, Roadmap
-import os
+"""
+Roadmap Generation Agent using AWS Bedrock (Claude 3)
+Generates personalized learning roadmaps based on user profiles
+"""
 import json
+import os
+from models import UserProfile, Roadmap
+from aws_config import get_bedrock_client, BEDROCK_MODEL_ID
 
 
 def generate_roadmap(profile: UserProfile) -> Roadmap:
     """
-    Generate a personalized learning roadmap using Google Gemini as an intelligent analyst.
+    Generate a personalized learning roadmap using AWS Bedrock (Claude 3).
     
     Args:
         profile: UserProfile containing user's learning goals and preferences
@@ -14,9 +18,8 @@ def generate_roadmap(profile: UserProfile) -> Roadmap:
     Returns:
         Roadmap: AI-generated learning roadmap with modules
     """
-    # Configure Gemini
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # Initialize AWS Bedrock client
+    bedrock_client = get_bedrock_client()
     
     # Extract profile data with defaults
     age = profile.age or "Not specified"
@@ -25,7 +28,7 @@ def generate_roadmap(profile: UserProfile) -> Roadmap:
     additional_context = profile.additional_context or "No additional context provided"
     
     # System prompt for intelligent curriculum design
-    prompt = f"""You are the core intelligence of AdaptEd, an adaptive learning platform.
+    prompt = f"""You are the core intelligence of AdaptEd, an adaptive learning platform powered by AWS.
 
 Your task is to generate a personalized learning roadmap based on the user's profile.
 
@@ -101,12 +104,29 @@ CRITICAL REQUIREMENTS:
 
 Generate a personalized learning roadmap for this profile."""
     
-    # Generate the roadmap
-    response = model.generate_content(prompt)
+    # Prepare request for Claude 3 via AWS Bedrock
+    request_body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 4000,
+        "temperature": 0.7,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    }
     
-    # Parse the response
     try:
-        content = response.text.strip()
+        # Call AWS Bedrock
+        response = bedrock_client.invoke_model(
+            modelId=BEDROCK_MODEL_ID,
+            body=json.dumps(request_body)
+        )
+        
+        # Parse response
+        response_body = json.loads(response['body'].read())
+        content = response_body['content'][0]['text'].strip()
         
         # Remove markdown code blocks if present
         if content.startswith("```json"):
@@ -126,12 +146,12 @@ Generate a personalized learning roadmap for this profile."""
         # Create Roadmap object
         roadmap = Roadmap(**roadmap_data)
         
-        print(f"[Roadmap Agent] Generated {len(roadmap.modules)} modules for {expertise_level} learner")
-        print(f"[Roadmap Agent] Goal: {primary_goal}")
+        print(f"[Roadmap Agent - AWS Bedrock] Generated {len(roadmap.modules)} modules for {expertise_level} learner")
+        print(f"[Roadmap Agent - AWS Bedrock] Goal: {primary_goal}")
         
         return roadmap
         
     except Exception as e:
-        print(f"Error parsing Gemini response: {e}")
-        print(f"Response content: {response.text[:500]}")
-        raise ValueError(f"Failed to parse roadmap from Gemini response: {str(e)}")
+        print(f"Error calling AWS Bedrock: {e}")
+        print(f"Model ID: {BEDROCK_MODEL_ID}")
+        raise ValueError(f"Failed to generate roadmap via AWS Bedrock: {str(e)}")

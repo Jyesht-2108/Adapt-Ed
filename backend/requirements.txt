@@ -1,8 +1,6 @@
 fastapi>=0.115.0
 pydantic>=2.0.0
 uvicorn>=0.32.0
-google-generativeai>=0.8.0
-google-api-python-client>=2.100.0
 python-dotenv>=1.0.0
 youtube-transcript-api>=0.6.0
 youtube-search-python>=1.6.6
@@ -10,12 +8,17 @@ ddgs>=1.0.0
 beautifulsoup4>=4.12.0
 requests>=2.32.0
 lxml>=5.0.0
-openai>=1.0.0
-pydub>=0.25.0
 python-multipart>=0.0.6
-groq>=0.4.0
-edge-tts>=6.1.0
 nest-asyncio>=1.5.0
-huggingface_hub
-pymongo>=4.6.0
+
+# AWS SDK (boto3) - Core AWS services
+boto3>=1.34.0
+botocore>=1.34.0
+
+# AWS Services Used:
+# - AWS Bedrock (Claude 3) for AI generation
+# - AWS DynamoDB for database
+# - AWS Transcribe for speech-to-text
+# - AWS Polly for text-to-speech
+# - AWS S3 for file storage
 

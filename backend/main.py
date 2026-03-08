@@ -7,16 +7,11 @@ from models import (
 )
 from agents import generate_roadmap as generate_ai_roadmap, generate_lesson as generate_ai_lesson, ContentRefineryAgent
 from agents.notes_agent import NotesGeneratorAgent
-from agents.viva_agent import get_interviewer_response, generate_initial_question, generate_final_feedback, evaluate_answer
-from agents.viva_agent_simple import SimpleVivaAgent
-from agents.viva_agent_hf import HuggingFaceVivaAgent
+from agents.viva_agent import VivaAgent
 from tools import search_youtube_video, get_video_transcript, get_video_content, search_web_docs
-from tools.tts_tool import generate_audio_bytes
-# from database import save_user_profile, get_user, check_user_status, update_user_roadmap
-# Uncomment the line below and comment the line above to use MongoDB
-# from mongodb_database import save_user_profile, get_user, check_user_status, update_user_roadmap
-from database import save_user_profile, get_user, check_user_status, update_user_roadmap
-from viva_database import create_session, get_session, update_session
+# AWS DynamoDB replaces JSON/MongoDB database
+from aws_dynamodb import save_user_profile, get_user, check_user_status, update_user_roadmap
+from aws_dynamodb import create_session, get_session, update_session
 from dotenv import load_dotenv
 import os
 import sys
@@ -30,46 +25,29 @@ from typing import Optional
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-# Set API key directly if not found (temporary workaround)
-if not os.getenv("GEMINI_API_KEY"):
-    # Read from .env file manually
-    if env_path.exists():
-        with open(env_path, 'r') as f:
-            for line in f:
-                if line.startswith('GEMINI_API_KEY='):
-                    api_key_value = line.strip().split('=', 1)[1]
-                    os.environ['GEMINI_API_KEY'] = api_key_value
-                    print(f"✓ Manually loaded GEMINI_API_KEY from .env", file=sys.stderr)
-                    break
-
-# Verify API key is loaded
-api_key = os.getenv("GEMINI_API_KEY")
+# Verify AWS credentials are loaded
+aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+aws_region = os.getenv("AWS_REGION", "us-east-1")
 youtube_api_key = os.getenv("YOUTUBE_API_KEY")
-openai_api_key = os.getenv("OPENAI_API_KEY")
-huggingface_api_key = os.getenv("HUGGINGFACE_API_KEY")
 
-if not api_key:
-    print("ERROR: GEMINI_API_KEY not found in environment!", file=sys.stderr)
+if not aws_access_key or not aws_secret_key:
+    print("ERROR: AWS credentials not found in environment!", file=sys.stderr)
     print(f"Tried loading from: {env_path}", file=sys.stderr)
     print(f"File exists: {env_path.exists()}", file=sys.stderr)
+    print("Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY", file=sys.stderr)
 else:
-    print(f"✓ GEMINI_API_KEY loaded successfully (length: {len(api_key)})", file=sys.stderr)
+    print(f"✓ AWS credentials loaded successfully", file=sys.stderr)
+    print(f"✓ AWS Region: {aws_region}", file=sys.stderr)
+    print(f"✓ Using AWS Bedrock (Claude 3) for AI generation", file=sys.stderr)
+    print(f"✓ Using AWS DynamoDB for database", file=sys.stderr)
+    print(f"✓ Using AWS Transcribe for speech-to-text", file=sys.stderr)
+    print(f"✓ Using AWS Polly for text-to-speech", file=sys.stderr)
 
 if youtube_api_key:
     print(f"✓ YOUTUBE_API_KEY loaded successfully (length: {len(youtube_api_key)})", file=sys.stderr)
 else:
     print("⚠ YOUTUBE_API_KEY not found - will use DuckDuckGo fallback for video search", file=sys.stderr)
-
-if openai_api_key:
-    print(f"✓ OPENAI_API_KEY loaded successfully (length: {len(openai_api_key)})", file=sys.stderr)
-else:
-    print("⚠ OPENAI_API_KEY not found - Viva Engine will not work", file=sys.stderr)
-
-if huggingface_api_key:
-    print(f"✓ HUGGINGFACE_API_KEY loaded successfully (length: {len(huggingface_api_key)})", file=sys.stderr)
-    print("  → Viva will use Hugging Face Zephyr-7b-beta model", file=sys.stderr)
-else:
-    print("⚠ HUGGINGFACE_API_KEY not found - Viva will use Gemini as fallback", file=sys.stderr)
 
 app = FastAPI(title="AdaptEd API", version="1.0.0")
 
